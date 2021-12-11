@@ -12,8 +12,11 @@ run_test: test
 debug: $(EXEC)
 	gdb -q $(EXEC)
 
-$(EXEC): main.c core.c
+$(EXEC): main.c core.c csort.c
 	$(CC) $(CFLAGS) $^ -o $@
+
+$(BUILD_DIR)/csort.o: csort.c
+	$(CC) $(CFLAGS) -c $^ -o $@
 
 $(BUILD_DIR)/core.o: core.c
 	$(CC) $(CFLAGS) -c $^ -o $@

@@ -48,6 +48,96 @@ void DEV_println(FILE* fp, char* fmt, ...) {
 }
 
 
+
+// --------------------------------------------------------------------------------------------
+// ~memory arena node 
+void
+CSortMemArenaNode_init(CSortMemArenaNode* node) {
+    node->mem_size = 512;
+    node->mem = (void*) DEV_malloc(node->mem_size, 1);
+    node->mem_cursor = (u8*) node->mem;
+    node->mem_free = 512;
+    node->mem_used = 0;
+}
+
+void
+CSortMemArenaNode_free(CSortMemArenaNode* node) {
+    free(node->mem);
+}
+
+
+void
+CSortMemArenaNode_fill(CSortMemArenaNode* node, void* data, u32 data_size) {
+    if (data_size >= node->mem_free) {
+        node->mem_size += 512;
+        node->mem_free += 512;
+        node->mem = (void*) DEV_realloc(node->mem, 1, node->mem_size);
+    }
+
+    memcpy(node->mem_cursor, data, data_size);
+    node->mem_cursor += data_size;
+    node->mem_used = data_size;
+}
+
+
+
+// --------------------------------------------------------------------------------------------
+// ~allocator
+CSortMemArena CSortMemArena_mk() {
+    return (CSortMemArena) {
+        .first = NULL,
+        .head = NULL,     
+    };
+}
+
+void
+CSortMemArena_free(CSortMemArena* arena) {
+    for (CSortMemArenaNode* ptr = arena->first, * tmp = ptr; ptr; tmp = ptr) {
+        ptr = ptr->next;
+        CSortMemArenaNode_free(tmp);
+        free(tmp);
+    }
+}
+
+CSortMemArenaNode*
+CSortMemArena_alloc(CSortMemArena* arena) {
+    CSortMemArenaNode* node = (CSortMemArenaNode*) DEV_malloc(1, sizeof(CSortMemArenaNode));
+    if (arena->head == NULL) {
+        arena->head = node;
+        arena->first = node;
+        node->prev = NULL;
+    } else {
+        node->prev = arena->head;
+        arena->head->next = node;
+        arena->head = node;
+    }
+
+    CSortMemArenaNode_init(node);
+    node->next = NULL;
+    return node;
+}
+
+void
+CSortMemArena_dealloc(CSortMemArena* arena, CSortMemArenaNode* node) {
+    CSortMemArenaNode* prev_node = node->prev;
+    CSortMemArenaNode* next_node = node->next;
+    if (! prev_node) {
+        arena->first = node->next;
+    } else {
+        prev_node->next = next_node;
+    }
+
+    if (! next_node) {
+        arena->head = prev_node;
+    } else {
+        next_node->prev = prev_node;
+    }
+    CSortMemArenaNode_free(node);
+    free(node);
+}
+
+
+
 // --------------------------------------------------------------------------------------------
 // ~str utilities
 char* str_find(char* begin, char* end, char c) {

@@ -67,6 +67,42 @@ extern void* DEV_realloc(void* prev, bsize chunk_size, bsize chunk_len);
 extern void DEV_println(FILE* fp, char* fmt, ...);
 
 
+
+// --------------------------------------------------------------------------------------------
+// ~Memory arena node 
+typedef struct CSortMemArenaNode CSortMemArenaNode;
+struct CSortMemArenaNode {
+    void* mem;
+    u8*   mem_cursor;
+    u32   mem_used,
+          mem_free,
+          mem_size;
+
+    struct CSortMemArenaNode* next;
+    struct CSortMemArenaNode* prev;
+};
+
+extern void CSortMemArenaNode_init(CSortMemArenaNode* node);
+extern void CSortMemArenaNode_free(CSortMemArenaNode* node);
+extern void CSortMemArenaNode_fill(CSortMemArenaNode* node, void* data, u32 data_size);
+
+
+
+// --------------------------------------------------------------------------------------------
+// ~allocator
+typedef struct CSortMemArena CSortMemArena;
+struct CSortMemArena {
+    CSortMemArenaNode* first;
+    CSortMemArenaNode* head;
+};
+
+extern CSortMemArena CSortMemArena_mk();
+extern void CSortMemArena_free(CSortMemArena* arena);
+extern CSortMemArenaNode* CSortMemArena_alloc(CSortMemArena* arena);
+extern void CSortMemArena_dealloc(CSortMemArena* arena, CSortMemArenaNode* node);
+
+
+
 // --------------------------------------------------------------------------------------------
 // ~str utilities
 extern char* str_find(char* begin, char* end, char c);
@@ -128,120 +164,5 @@ extern inline void string_free(String* s);
 extern String string_slice(const char* begin, const char* end);
 extern String_View SV_fromString(const String* s);
 extern String_View string_toSV(const String* s);
-
-
-/*
- *
- * Dynamic Array with static memory initialized, with push, pop, delete, insert operations
- * Struct should have `_free` func, since we need to free each elem
- * @param(X) Must be a type, since we would be needing this for getting `sizeof`
- *
- */
-#define DynArray(X) struct DynArray_##X
-#define DynArray_define(X)\
-struct DynArray_##X {     \
-    struct X* data;       \
-                          \
-    uintptr_t len,        \
-              size;       \
-};                        \
-
-
-/*
- * @Usage
- * DynArray_defineAndDeclare(myStruct) blah;
- *
- *
- * @what(This will create an struct and assign to a variable then and there)
- *
- * struct myStruct {
- *    ...
- * } balh;
- *
- *
- *
- * @what(For making container of self referencial ptrs)
- *
- * struct myStruct {
- *    int data;
- *
- *    DynArray_defineAndDeclare(myStruct) refers;
- *  };
- *
- *  extern inline void myStruct_free(myStruct* Struct);
- *
- *  // define struct `DynArray_myStruct` utilities, since we already defined it inside myStruct and `static` funcs for it
- *  // myStruct must implement myStruct_free for free'ing resources
- *  DynArray_defineUtilities(myStruct)
- *
- */ 
-#define DynArray_defineAndDeclare(X)\
-struct DynArray_##X {     \
-    struct X* data;       \
-                          \
-    uintptr_t len,        \
-              size;       \
-}
-
-#define DynArray_defineUtilities(X)\
-_DynArray_mk(X)         \
-_DynArray_free(X)         \
-_DynArray_push(X)         \
-_DynArray_pop(X)          \
-_DynArray_getRef(X)
-
-#define DynArray_defineWithUtilities(X)\
-    DynArray_define(X)                 \
-    DynArray_defineUtilities(X)
-
-
-#define _DynArray_mk(X)\
-    static struct DynArray_##X DynArray_##X##_mk() {\
-        struct DynArray_##X DynArray_##X_instance;\
-        DynArray_##X_instance.len = 0;\
-        DynArray_##X_instance.size = 1 << 6;\
-        DynArray_##X_instance.data = (struct X*) DEV_malloc(DynArray_##X_instance.size, sizeof(struct X));\
-        DEV_memzero(DynArray_##X_instance.data, DynArray_##X_instance.size* sizeof(struct X));\
-        return DynArray_##X_instance;\
-    }
-
-#define _DynArray_free(X)         \
-    static void DynArray_##X##_free(struct DynArray_##X* instance) {\
-        FOR (i, instance->len) {\
-            X##_free(&(instance->data[i]));\
-        }\
-        free(instance->data);\
-    }
-
-#define _DynArray_checkReallocState(X, Y)\
-    if ((Y)->len >= (Y)->size) {\
-        (Y)->size += 1 << 8;\
-        (Y)->data = (struct X*) DEV_realloc((Y)->data, (Y)->size, sizeof(struct X));\
-    }
-
-#define _DynArray_push(X)\
-    static void DynArray_##X##_push(struct DynArray_##X* instance, struct X data) {\
-        _DynArray_checkReallocState(X, instance);\
-        instance->data[(instance->len)++] = data;\
-    }
-
-#define _DynArray_pop(X)\
-    static void DynArray_##X##_pop(struct DynArray_##X* instance) {\
-        X##_##free(&(instance->data[instance->len]));\
-        --(instance->len);\
-    }
-
-#define IS_RANGE(X, Y, Z) ((X) > (Y) && (X) < (Z))
-#define IS_RANGE_withBound(X, Y, Z) (((X) >= (Y)) && ((X) <= (Z)))
-#define _DynArray_getRef(X)\
-    static inline const struct X* DynArray_##X##_getRef(const struct DynArray_##X* instance, int idx) {\
-        if (! IS_RANGE_withBound(idx, 0, instance->len)) return NULL;\
-        return &(instance->data[idx]);\
-    }\
-     \
-    static inline const struct X* DynArray_##X##_getRefWithAssert(const struct DynArray_##X* instance, int idx) {\
-        assert(idx >= 0 && idx <= instance->len);\
-        return &(instance->data[idx]);\
-    }
 
 #endif
