@@ -36,13 +36,16 @@ typedef struct CSortToken CSortToken;
 struct CSortToken {
     String_View tok_view;
     enum CSortTokenType type;
+
+    u32 next_tok_offset;
 };
 
-inline internal CSortToken
-CSortToken_mk(const String_View tok_view, enum CSortTokenType type) {
+internal inline CSortToken
+CSortToken_mk(const String_View tok_view, enum CSortTokenType type, u32 next_tok_offset) {
     return (CSortToken) {
         .tok_view = tok_view,
         .type = type,
+        .next_tok_offset = next_tok_offset,
     };
 }
 

@@ -28,50 +28,74 @@ CSort_panic(CSort* csort, const char* msg) {
 
 
 // --------------------------------------------------------------------------------------------
+internal inline enum CSortTokenType
+CSort_gettokentype(const String_View* tok_view) {
+    if (SV_isEq(*tok_view, SV("from"))) {
+        return CSortTokenFrom;
+    } else if (SV_isEq(*tok_view, SV("import"))) {
+        return CSortTokenImport;
+    }
+    return CSortTokenIdentifier;
+}
+
+
 internal CSortToken
 CSort_nexttoken(CSort* csort, const String_View* buf_view) {
     varPersist String_View tok_view = {0};
+    varPersist enum CSortTokenType tok_type;
     char* tok_begin = SV_begin(*buf_view);
+    char* tok_end = SV_end(*buf_view);
 
-    for (char* c = tok_begin; c != SV_end(*buf_view); ++c) {
+    tok_begin = str_findFirstNotOf(tok_begin, tok_end, ' ');
+
+    for (char* c = tok_begin; c != tok_end; ++c) {
         switch (*c) {
-            case ' ':
+            case ' ': {
+                tok_view = SV_slice(tok_begin, c);
+                char* new_c = str_findFirstNotOf(c, tok_end, ' ');
+                tok_type = CSort_gettokentype(&tok_view);
+                return CSortToken_mk(tok_view, tok_type, new_c - c);
+            }
+            break;
+
+            case ',': {
                 if (c == tok_begin) {
-                    return CSortToken_mk(tok_view, CSortTokenSpace);
+                    tok_view = SV_buff(c, 1);
+                    return CSortToken_mk(tok_view, CSortTokenComma, 0);
                 }
                 tok_view = SV_slice(tok_begin, c);
-                if (SV_isEq(tok_view, SV("from"))) {
-                    return CSortToken_mk(tok_view, CSortTokenFrom);
-                } else if (SV_isEq(tok_view, SV("import"))) {
-                    return CSortToken_mk(tok_view, CSortTokenImport);
-                } else {
-                    return CSortToken_mk(tok_view, CSortTokenIdentifier);
-                }
-
-            case ',':
-                tok_view = SV_buff(c, 1);
-                return CSortToken_mk(tok_view, CSortTokenComma);
+                tok_type = CSort_gettokentype(&tok_view);
+                return CSortToken_mk(tok_view, tok_type, 0);
+            }
+            break;
 
             case '#':
                 tok_view = SV_buff(c, 1);
-                return CSortToken_mk(tok_view, CSortTokenComment);
+                return CSortToken_mk(tok_view, CSortTokenComment, 0);
 
             case '\n': {
                 if (c == tok_begin) {
-                    return CSortToken_mk(tok_view, CSortTokenNewline);
+                    return CSortToken_mk(tok_view, CSortTokenNewline, 0);
                 }
                 tok_view = SV_slice(tok_begin, c);
-                return CSortToken_mk(tok_view, CSortTokenIdentifier);
+                tok_type = CSort_gettokentype(&tok_view);
+                return CSortToken_mk(tok_view, tok_type, 0);
            }
         }
     }
 
-    return CSortToken_mk(tok_view, CSortTokenNewline);
+    return CSortToken_mk(tok_view, CSortTokenNewline, 0);
 }
 
 
 
 // --------------------------------------------------------------------------------------------
+internal inline String_View
+CSort_inc_buff(const String_View* prev_buff, const CSortToken* tok) {
+    return SV_buff(SV_end(tok->tok_view) + tok->next_tok_offset, prev_buff->len - SV_len(tok->tok_view) - tok->next_tok_offset);
+}
+
+
 void
 CSort_sortit(CSort* csort) {
     varPersist CSortToken tok = {0};
@@ -83,7 +107,7 @@ CSort_sortit(CSort* csort) {
 
     String_View buf_view = SV(buf);
     while (tok = CSort_nexttoken(csort, &buf_view), tok.type != CSortTokenEnd) {
-        buf_view = SV_buff(SV_end(tok.tok_view), buf_view.len - tok.tok_view.len);
+        buf_view = CSort_inc_buff(&buf_view, &tok);
 
         switch (tok.type) {
             case CSortTokenComment:
@@ -100,19 +124,18 @@ CSort_sortit(CSort* csort) {
                 buf_view = SV(buf);
                 break;
 
-            case CSortTokenSpace:
-                buf_view = SV_buff(SV_end(tok.tok_view) + 1, buf_view.len - tok.tok_view.len);
-                break;
-
-
-            case CSortTokenFrom:
+            case CSortTokenFrom: {
+                    /*tok = CSort_nexttoken(csort, &buf_view);*/
+                    println("TOK: %s, LEN: %d", tok.tok_view.data, tok.tok_view.len);
+                } 
                 break;
 
             case CSortTokenImport:
+                println("TOK: %s, LEN: %d", tok.tok_view.data, tok.tok_view.len);
                 break;
 
             case CSortTokenIdentifier:
-                buf_view = SV_buff(SV_end(tok.tok_view), buf_view.len - tok.tok_view.len);
+                println("TOK: %*s, LEN: %d",  tok.tok_view.len, tok.tok_view.data, tok.tok_view.len);
                 break;
 
             case CSortTokenComma:
