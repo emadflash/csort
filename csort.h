@@ -16,8 +16,34 @@ struct CSort {
 extern inline CSort CSort_mk(const String_View fileName, FILE* file);
 extern inline void CSort_free(CSort* csort);
 extern inline void CSort_panic(CSort* csort, const char* msg);
-
 extern void CSort_sortit(CSort* csort);
 
+
+
+// --------------------------------------------------------------------------------------------
+enum CSortTokenType {
+    CSortTokenFrom,
+    CSortTokenImport,
+    CSortTokenComma,
+    CSortTokenSpace,
+    CSortTokenIdentifier,
+    CSortTokenNewline,
+    CSortTokenEnd,
+    CSortTokenComment,
+};
+
+typedef struct CSortToken CSortToken;
+struct CSortToken {
+    String_View tok_view;
+    enum CSortTokenType type;
+};
+
+inline internal CSortToken
+CSortToken_mk(const String_View tok_view, enum CSortTokenType type) {
+    return (CSortToken) {
+        .tok_view = tok_view,
+        .type = type,
+    };
+}
 
 #endif
