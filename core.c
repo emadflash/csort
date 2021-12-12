@@ -3,7 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <errno.h>
 #include <assert.h>
+#include <limits.h>
 
 
 // --------------------------------------------------------------------------------------------
@@ -38,6 +40,23 @@ void* DEV_realloc(void* prev, bsize chunk_size, bsize chunk_len) {
 }
 
 
+int
+DEV_strToInt(const char* str, u64* strInt, int base) {
+   char* endptr;
+   errno = 0;
+   *strInt = strtol(str, &endptr, base);
+
+   if ((errno == ERANGE && (*strInt == LLONG_MAX || *strInt == LONG_MIN))
+           || (errno != 0 && *strInt == 0)) {
+       return -1;
+   }
+
+   if (endptr == str) {
+       return -1;
+   }
+   return 0;
+}
+
 // --------------------------------------------------------------------------------------------
 // ~print utilites
 void DEV_println(FILE* fp, char* fmt, ...) {
@@ -69,14 +88,14 @@ CSortMemArenaNode_free(CSortMemArenaNode* node) {
 void
 CSortMemArenaNode_fill(CSortMemArenaNode* node, void* data, u32 data_size) {
     if (data_size >= node->mem_free) {
-        node->mem_size += 512;
-        node->mem_free += 512;
+        node->mem_size += data_size;
         node->mem = (void*) DEV_realloc(node->mem, 1, node->mem_size);
     }
 
     memcpy(node->mem_cursor, data, data_size);
     node->mem_cursor += data_size;
-    node->mem_used = data_size;
+    node->mem_used += data_size;
+    node->mem_free -= data_size;
 }
 
 
@@ -137,6 +156,15 @@ CSortMemArena_dealloc(CSortMemArena* arena, CSortMemArenaNode* node) {
 }
 
 
+inline CSortMemArenaNode*
+CSortMemArenaCopyCStr(CSortMemArena* arena, char* string, u32 string_size) {
+    CSortMemArenaNode* n = CSortMemArena_alloc(arena);
+    CSortMemArenaNode_fill(n, (void*) string, string_size);
+    CSortMemArenaNode_fill(n, (void*)"\0", 1);
+
+    return n;
+}
+
 
 // --------------------------------------------------------------------------------------------
 // ~str utilities
@@ -148,28 +176,53 @@ char* str_find(char* begin, char* end, char c) {
     return end;
 }
 
-char* str_findFirstNotOf(char* begin, char* end, char c) {
+char* str_findPred(char* begin, char* end, int (*predicate)(int)) {
     for (char* p = begin; p != end; ++p) {
-        if (*p != c) return p;
+        if (predicate(*p)) return p;
     }
 
     return begin;
 }
 
-char* str_find_backward(char* begin, char* end, char c) {
+char* str_findFirstNotOf(char* begin, char* end, char c) {
+    for (char* p = begin; p != end; ++p) {
+        if (*p != c) return p;
+    }
+    return begin;
+}
+
+char* str_findFirstNotOfPred(char* begin, char* end, int (*predicate)(int)) {
+    for (char* p = begin; p != end; ++p) {
+        if (! predicate(*p)) return p;
+    }
+    return begin;
+}
+
+char* str_findRev(char* begin, char* end, char c) {
     for (char* p = end - 1; p != begin - 1; --p) {
         if (*p == c) return p;
     }
-
     return end;
 }
 
-char* str_findFirstNotOf_backward(char* begin, char* end, char c) {
+char* str_findPredRev(char* begin, char* end, int (*predicate)(int)) {
+    for (char* p = end - 1; p != begin - 1; --p) {
+        if (predicate(*p)) return p;
+    }
+    return end;
+}
+
+char* str_findFirstNotOfRev(char* begin, char* end, char c) {
     for (char* p = end - 1; p != begin - 1; --p) {
         if (*p != c) return p;
-        --p;
     }
+    return begin;
+}
 
+char* str_findFirstNotOfPredRev(char* begin, char* end, int (*predicate)(int)) {
+    for (char* p = end - 1; p != begin - 1; --p) {
+        if (! predicate(*p)) return p;
+    }
     return begin;
 }
 
@@ -209,7 +262,7 @@ String_View SV_chop(String_View sv, char c) {
 }
 
 String_View SV_chop_backward(String_View sv, char c) {
-    char* p = SV_findFirstNotOf_backward(sv, c);
+    char* p = SV_findFirstNotOfRev(sv, c);
     if (p == SV_end(sv)) {
         return sv;
     }
@@ -286,4 +339,51 @@ String_View string_toSV(const String* s) {
         .data = s->data,
         .len = s->len,
     };
+}
+
+
+
+// --------------------------------------------------------------------------------------------
+DynArray
+DynArray_mk(u32 chunk_size) {
+    DynArray arr = {0};
+    arr.mem_size = 1 << 4;
+    arr.chunk_size = chunk_size;
+    arr.mem = (void*) DEV_malloc(arr.mem_size, arr.chunk_size);
+    arr.mem_cursor = (u8*) arr.mem;
+    arr.mem_free = 1 << 4;
+    arr.len = 0;
+    return arr;
+}
+
+void
+DynArray_free(DynArray* arr) {
+    free(arr->mem);
+}
+
+inline void*
+DynArray_get(DynArray* arr, u32 idx) {
+    return (void*) ((u8*) arr->mem + arr->chunk_size * idx);
+}
+
+void
+DynArray_push(DynArray* arr, void* data) {
+    if (arr->len >= arr->mem_size) {
+        arr->mem_size += 1 << 4;
+        arr->mem = (void*) DEV_realloc(arr->mem, arr->chunk_size, arr->mem_size);
+    }
+
+    memcpy(arr->mem + arr->chunk_size* arr->len, data, arr->chunk_size);
+    arr->len += 1;
+    arr->mem_free -= 1;
+    arr->mem_cursor += arr->chunk_size;
+}
+
+int
+DynArray_pop(DynArray* arr) {
+    if (arr->len <= 0) {
+        return -1;
+    }
+    arr->len -= 1;
+    return 0;
 }

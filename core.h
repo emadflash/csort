@@ -54,6 +54,7 @@ extern void die(char *fmt, ...);
 extern FILE* DEV_fopen(const char* file, const char* mode);
 extern void* DEV_malloc(bsize chunk_size, bsize chunk_len);
 extern void* DEV_realloc(void* prev, bsize chunk_size, bsize chunk_len); 
+extern int DEV_strToInt(const char* str, u64* strInt, int base);
 
 
 // --------------------------------------------------------------------------------------------
@@ -100,6 +101,7 @@ extern CSortMemArena CSortMemArena_mk();
 extern void CSortMemArena_free(CSortMemArena* arena);
 extern CSortMemArenaNode* CSortMemArena_alloc(CSortMemArena* arena);
 extern void CSortMemArena_dealloc(CSortMemArena* arena, CSortMemArenaNode* node);
+extern inline CSortMemArenaNode* CSortMemArenaCopyCStr(CSortMemArena* arena, char* string, u32 string_size);
 
 
 
@@ -107,13 +109,15 @@ extern void CSortMemArena_dealloc(CSortMemArena* arena, CSortMemArenaNode* node)
 // ~str utilities
 extern char* str_find(char* begin, char* end, char c);
 extern char* str_findFirstNotOf(char* begin, char* end, char c);
-extern char* str_findFirstNotOf_backward(char* begin, char* end, char c);
+extern char* str_findFirstNotOfRev(char* begin, char* end, char c);
+extern char* str_findPredRev(char* begin, char* end, int (*predicate)(int));
+extern char* str_findFirstNotOfPredRev(char* begin, char* end, int (*predicate)(int));
 
 
 // --------------------------------------------------------------------------------------------
 // ~String_View
 #define SV_print(X) fprintf(stdout, "[data: %.*s, size: %ld]", (X).len, (X).data, (X).len)
-#define SV_arg(X) ((X).data)
+#define SV_data(X) ((X).data)
 #define SV_len(X) ((X).len)
 #define SV_begin(X) ((X).data)
 #define SV_end(X) ((X).data + (X).len)
@@ -122,9 +126,12 @@ extern char* str_findFirstNotOf_backward(char* begin, char* end, char c);
 #define SV_isEq(X, Y) DEV_strIsEqN((X).data, (X).len, (Y).data, (Y).len)
 #define SV_isEqRaw(X, Y) DEV_strIsEqN((X).data, (X).len, (Y), strlen((Y)))
 #define SV_find(X, Y) str_find(SV_begin(X), SV_end(X), Y)
-#define SV_find_backward(X, Y) str_find_backward(SV_begin(X), SV_end(X), Y)
+#define SV_findPred(X, Y) str_find(SV_begin(X), SV_end(X), Y)
+#define SV_findPredRev(X, Y) str_findPredRev(SV_begin(X), SV_end(X), Y)
 #define SV_findFirstNotOf(X, Y) str_findFirstNotOf(SV_begin(X), SV_end(X), Y)
-#define SV_findFirstNotOf_backward(X, Y) str_findFirstNotOf_backward(SV_begin(X), SV_end(X), Y)
+#define SV_findFirstNotOfPred(X, Y) str_findFirstNotOfPred(SV_begin(X), SV_end(X), Y)
+#define SV_findFirstNotOfRev(X, Y) str_findFirstNotOfRev(SV_begin(X), SV_end(X), Y)
+#define SV_findFirstNotOfPredRev(X, Y) str_findFirstNotOfPredRev(SV_begin(X), SV_end(X), Y)
 
 typedef struct String_View String_View;
 struct String_View {
@@ -164,5 +171,24 @@ extern inline void string_free(String* s);
 extern String string_slice(const char* begin, const char* end);
 extern String_View SV_fromString(const String* s);
 extern String_View string_toSV(const String* s);
+
+
+
+// --------------------------------------------------------------------------------------------
+typedef struct DynArray DynArray;
+struct DynArray {
+    void* mem;
+    u8*   mem_cursor;
+    u32   chunk_size;
+    u32   len,
+          mem_free,
+          mem_size;
+};
+
+extern DynArray DynArray_mk(u32 chunk_size);
+extern void DynArray_free(DynArray* arr);
+extern void DynArray_push(DynArray* arr, void* data);
+extern inline void* DynArray_get(DynArray* arr, u32 idx);
+
 
 #endif

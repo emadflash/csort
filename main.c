@@ -16,6 +16,7 @@ int main() {
     CSort csort = CSort_mk(SV(fileName), fp);
 
     CSort_sortit(&csort);
+    CSort_print_imports(&csort);
     CSort_free(&csort);
 
     return 0;
