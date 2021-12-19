@@ -137,7 +137,7 @@ CSort_free(CSort* csort) {
 
 inline void
 CSort_panic(CSort* csort, const char* msg, ...) {
-    fprintf(stderr, "panic: ");
+    fprintf(stderr, "csort: ");
     va_list ap;
     va_start(ap, msg);
     vfprintf(stderr, msg, ap);
@@ -247,12 +247,13 @@ CSort_inc_buff(const String_View* prev_buff, const CSortToken* tok) {
 
 
 internal CSortToken
-CSort_nexttoken(CSort* csort, const char* static_buf_begin, const String_View* buf_view, const u32* line_counter) {
-#define _col_offset(X) ((X) - static_buf_begin)
+CSort_nexttoken(const _ParseInfo* p) {
+#define _col_offset(X) ((X) - static_buf)
     varPersist String_View tok_view = {0};
     varPersist enum CSortTokenType tok_type;
-    char* tok_begin = SV_begin(*buf_view);
-    char* tok_end = SV_end(*buf_view);
+    char* tok_begin = SV_begin(p->buf_view);
+    char* tok_end = SV_end(p->buf_view);
+    const char* static_buf = p->buf;
 
     tok_begin = str_findFirstNotOf(tok_begin, tok_end, ' ');
 
@@ -262,49 +263,46 @@ CSort_nexttoken(CSort* csort, const char* static_buf_begin, const String_View* b
                 tok_view = SV_slice(tok_begin, c);
                 char* new_c = str_findFirstNotOf(c, tok_end, ' ');
                 tok_type = CSort_gettokentype(&tok_view);
-                return CSortToken_mk(tok_view, tok_type, new_c - c, *line_counter, _col_offset(c));
+                if (tok_type == CSortTokenFrom) {
+                    if (tok_begin == static_buf) {
+                        return CSortToken_mk(tok_view, tok_type, new_c - c, p->line_counter, _col_offset(c));
+                    }
+                } else if (tok_type == CSortTokenImport) {
+                    // TODO(emf): check if the previous token type we parsed was `from` or its at start of buffer
+                    return CSortToken_mk(tok_view, tok_type, new_c - c, p->line_counter, _col_offset(c));
+                } else {
+                    return CSortToken_mk(tok_view, tok_type, new_c - c, p->line_counter, _col_offset(c));
+                }
             }
             break;
 
             case ',': {
                 if (c == tok_begin) {
                     tok_view = SV_buff(c, 1);
-                    return CSortToken_mk(tok_view, CSortTokenComma, 0, *line_counter, _col_offset(c));
+                    return CSortToken_mk(tok_view, CSortTokenComma, 0, p->line_counter, _col_offset(c));
                 }
                 tok_view = SV_slice(tok_begin, c);
                 tok_type = CSort_gettokentype(&tok_view);
-                return CSortToken_mk(tok_view, tok_type, 0, *line_counter, _col_offset(c));
+                return CSortToken_mk(tok_view, tok_type, 0, p->line_counter, _col_offset(c));
             }
             break;
 
             case '#':
                 tok_view = SV_buff(c, 1);
-                return CSortToken_mk(tok_view, CSortTokenComment, 0, *line_counter, _col_offset(c));
+                return CSortToken_mk(tok_view, CSortTokenComment, 0, p->line_counter, _col_offset(c));
 
             case '\n': {
                 tok_view = SV_slice(tok_begin, c);
                 if (c == tok_begin) {
-                    return CSortToken_mk(tok_view, CSortTokenNewline, 0, *line_counter, _col_offset(c));
+                    return CSortToken_mk(tok_view, CSortTokenNewline, 0, p->line_counter, _col_offset(c));
                 }
                 tok_type = CSort_gettokentype(&tok_view);
-                return CSortToken_mk(tok_view, tok_type, 0, *line_counter, _col_offset(c));
+                return CSortToken_mk(tok_view, tok_type, 0, p->line_counter, _col_offset(c));
            }
         }
     }
 
-    return CSortToken_mk(tok_view, CSortTokenNewline, 0, *line_counter, _col_offset(tok_begin));
-}
-
-
-
-// fills the buffer with newline and updates the `line_counter`
-internal int
-_getline(const CSort* csort, char* buf, u32 buf_size, u32* line_counter) {
-    if (! fgets(buf, buf_size, csort->file)) {
-        return -1;
-    }
-    ++*line_counter;
-    return 0;
+    return CSortToken_mk(tok_view, CSortTokenNewline, 0, p->line_counter, _col_offset(tok_begin));
 }
 
 
@@ -359,40 +357,30 @@ _search_import_from_statement(CSortModuleObjNode* n, const String_View* tok_view
 // Parse functions
 // 
 // --------------------------------------------------------------------------------------------
-typedef struct _ParseInfo _ParseInfo;
-struct _ParseInfo {
-    CSort*       csort;
-    CSortToken*  tok;
-    char*        static_buf_begin;                      // Save buf_view begin for getting offset
-    String_View* buf_view;
-    u32*         line_counter;
-};
-
-
-internal inline _ParseInfo
-_ParseInfo_mk(CSort* csort, CSortToken* tok, const char* static_buf_begin, String_View* buf_view, u32* line_counter) {
-    return (_ParseInfo) {
-        .csort = csort,
-        .tok = tok,
-        .static_buf_begin = static_buf_begin,
-        .buf_view = buf_view,
-        .line_counter = line_counter,
-    };
+// fills the buffer with newline and updates the `line_counter`
+internal int
+_getline(_ParseInfo* p) {
+    bzero(p->buf, 512);
+    if (! fgets(p->buf, 512, p->csort->file)) {
+        return -1;
+    }
+    p->line_counter += 1;
+    return 0;
 }
 
 
 internal inline const CSortToken*
 _update_token(_ParseInfo* p) {
-    *(p->tok) = CSort_nexttoken(p->csort, p->static_buf_begin, p->buf_view, p->line_counter);
+    p->prev_tok_type = p->tok->type;
+    *(p->tok) = CSort_nexttoken(p);
     if (p->tok->type == CSortTokenNewline || p->tok->type == CSortTokenComment) {
-        if (_getline(p->csort, p->static_buf_begin, 512, p->line_counter) < 0) {
+        if (_getline(p) < 0) {
             *(p->tok) = CSortToken_mk(p->tok->tok_view, CSortTokenEnd, 0, 0, 0);
         } else {
-            *(p->buf_view) = SV(p->buf_view->data);
-            p->static_buf_begin = p->buf_view->data;
+            p->buf_view = SV(p->buf);
         }
     } else {
-        *(p->buf_view) = CSort_inc_buff(p->buf_view, p->tok);
+        p->buf_view = CSort_inc_buff(&p->buf_view, p->tok);
     }
 
     return p->tok;
@@ -474,17 +462,13 @@ _parse_import_after_from(CSort* csort, _ParseInfo* parse_info, CSortModuleObjNod
 // --------------------------------------------------------------------------------------------
 void
 CSort_sortit(CSort* csort) {
-    varPersist CSortToken initial_tok = {0};
     varPersist const CSortToken* tok;
-    varPersist char buf[512];
-    u32 line_counter = 0;
 
-    if (_getline(csort, buf, 512, &line_counter) < 0) {
-        CSort_panic(csort, "file is empty");
+    CSortToken initial_tok = CSortToken_mk_initial();
+    _ParseInfo parse_info = _ParseInfo_mk(csort, &initial_tok);
+    if (_getline(&parse_info) < 0) {
+        CSort_panic(csort, "file empty!");
     }
-
-    String_View buf_view = SV(buf);
-    _ParseInfo parse_info = _ParseInfo_mk(csort, &initial_tok, SV_begin(buf_view), &buf_view, &line_counter);
 
     while (tok = _update_token(&parse_info), tok->type != CSortTokenEnd) {
         if (tok->type == CSortTokenImport) {
@@ -494,7 +478,7 @@ CSort_sortit(CSort* csort) {
                 CSort_append_module(csort, _import);
             }
         } else if (tok->type == CSortTokenFrom) {
-            _update_token(&parse_info);
+            tok = _update_token(&parse_info);
 
             if (tok->type != CSortTokenIdentifier) {
                 CSort_report_unexpected_errs(csort, tok);
@@ -512,7 +496,7 @@ CSort_sortit(CSort* csort) {
                     _from_import = CSortModuleObjNode_mk(csort, &tok->tok_view, NULL, CSortModuleKind_FROM);
                 }
 
-                _update_token(&parse_info);
+                tok = _update_token(&parse_info);
                 if (tok->type != CSortTokenImport) {
                     CSort_panic_tok(csort, tok, "Expected import statement got '%.*s'", SV_len(tok->tok_view), SV_data(tok->tok_view));
                 }

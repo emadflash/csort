@@ -1,5 +1,3 @@
-### Copied from https://pypi.org/project/isort/
-
 from my_lib import Object
 
 import os
@@ -26,3 +24,7 @@ parserForComic.add_argument("wut_comic", choices=["xkcd", "ext"])
 parserForComic.add_argument(
     "--save-as", type=str, default=None, help="save comic as"
 )
+parserForComic.add_argument(
+    "--download-from", type=str, default=None, help="download import page"
+)
+parserForComic.add_argument("--pdf", action="store_true", help="create pdf")

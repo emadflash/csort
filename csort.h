@@ -71,6 +71,7 @@ enum CSortTokenType {
     CSortTokenSpace,
     CSortTokenIdentifier,
     CSortTokenNewline,
+    CSortTokenStart,
     CSortTokenEnd,
     CSortTokenComment,
 };
@@ -94,6 +95,43 @@ CSortToken_mk(const String_View tok_view, enum CSortTokenType type, u32 next_tok
         .line_num = line_num,
         .col_offset = col_offset,
     };
+}
+
+internal inline CSortToken
+CSortToken_mk_initial() {
+    return (CSortToken) {
+        .tok_view = {0},
+        .type = CSortTokenStart,
+        .next_tok_offset = 0,
+        .line_num = 0,
+        .col_offset = 0,
+    };
+}
+
+
+
+// --------------------------------------------------------------------------------------------
+typedef struct _ParseInfo _ParseInfo;
+struct _ParseInfo {
+    CSort*         csort;
+    CSortToken*    tok;
+    enum CSortTokenType prev_tok_type;
+    char           buf[512];
+    String_View    buf_view;
+    u32            line_counter;
+};
+
+
+internal inline _ParseInfo
+_ParseInfo_mk(CSort* csort, CSortToken* tok) {
+    _ParseInfo p = {0};
+    p.csort = csort;
+    p.prev_tok_type = CSortTokenStart;
+    p.tok = tok;
+    p.buf_view = SV_buff(p.buf, 0);
+    p.line_counter = 0;
+
+    return p;
 }
 
 #endif
