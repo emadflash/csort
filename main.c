@@ -32,6 +32,7 @@ int main(int argc, char* argv[]) {
     }
 
     CSort csort = CSort_mk(SV(fileName), fp, _config_file_to_load());
+    CSort_loadConfig(&csort);
     CSort_sortit(&csort);
     CSort_print_imports(&csort);
     CSort_free(&csort);

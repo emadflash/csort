@@ -13,6 +13,11 @@ typedef struct CSortConfig CSortConfig;
 struct CSortConfig {
     CSortMemArena* arena;
     lua_State* lua;
+
+    bool squash_for_duplicate_library;
+    u32 wrap_after_n_imports,
+        import_on_each_wrap,
+        wrap_after_col;
 };
 
 

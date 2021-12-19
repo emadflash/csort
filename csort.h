@@ -45,7 +45,7 @@ struct CSort {
     String_View fileName;
 
     CSortMemArena arena;
-    CSortConfig configManager;
+    CSortConfig conf;
 
     CSortModuleObjNode* modules_curr_node, * modules;
 };
@@ -53,6 +53,7 @@ struct CSort {
 extern inline CSort CSort_mk(const String_View fileName, FILE* file, const char* luaConfig);
 extern inline void CSort_free(CSort* csort);
 extern inline void CSort_panic(CSort* csort, const char* msg, ...);
+extern void CSort_loadConfig(CSort* csort);
 extern void CSort_sortit(CSort* csort);
 
 
