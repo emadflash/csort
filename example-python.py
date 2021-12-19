@@ -20,3 +20,9 @@ from third_party import lib3
 
 print("Hey")
 print("yo")
+
+parserForComic = subparsers.add_parser("comic")
+parserForComic.add_argument("wut_comic", choices=["xkcd", "ext"])
+parserForComic.add_argument(
+    "--save-as", type=str, default=None, help="save comic as"
+)

@@ -50,7 +50,7 @@ struct CSort {
     CSortModuleObjNode* modules_curr_node, * modules;
 };
 
-extern inline CSort CSort_mk(const String_View fileName, FILE* file);
+extern inline CSort CSort_mk(const String_View fileName, FILE* file, const char* luaConfig);
 extern inline void CSort_free(CSort* csort);
 extern inline void CSort_panic(CSort* csort, const char* msg, ...);
 extern void CSort_sortit(CSort* csort);

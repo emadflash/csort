@@ -4,8 +4,6 @@
 #include <stdbool.h>
 #include <ctype.h>
 
-
-#define CONFIG_LUA_DEFAULT "config.lua"
 #define CSORT_MAX(X, Y) ((X) > (Y) ? 1 : 0)
 #define CSORT_MIN(X, Y) ((X) < (Y) ? 1 : 0)
 
@@ -114,15 +112,15 @@ _sort_imports(CSortModuleObjNode* n) {
 // 
 // --------------------------------------------------------------------------------------------
 inline CSort
-CSort_mk(const String_View fileName, FILE* file) {
+CSort_mk(const String_View fileName, FILE* file, const char* luaConfig) {
     CSort csort = {0};
     csort.fileName = fileName;
     csort.file = file;
     csort.arena = CSortMemArena_mk();
     csort.modules = csort.modules_curr_node = NULL;
 
-    if (CSortConfig_init(&csort.configManager, &csort.arena, CONFIG_LUA_DEFAULT) < 0) {
-        CSort_panic(&csort, "Cannot load deafult config file: %s", CONFIG_LUA_DEFAULT);
+    if (CSortConfig_init(&csort.configManager, &csort.arena, luaConfig) < 0) {
+        CSort_panic(&csort, "Cannot load deafult config file: %s", luaConfig);
     }
     return csort;
 }
@@ -372,7 +370,7 @@ struct _ParseInfo {
 
 
 internal inline _ParseInfo
-_ParseInfo_mk(CSort* csort, CSortToken* tok, String_View* static_buf_begin, String_View* buf_view, u32* line_counter) {
+_ParseInfo_mk(CSort* csort, CSortToken* tok, const char* static_buf_begin, String_View* buf_view, u32* line_counter) {
     return (_ParseInfo) {
         .csort = csort,
         .tok = tok,
@@ -387,7 +385,7 @@ internal inline const CSortToken*
 _update_token(_ParseInfo* p) {
     *(p->tok) = CSort_nexttoken(p->csort, p->static_buf_begin, p->buf_view, p->line_counter);
     if (p->tok->type == CSortTokenNewline || p->tok->type == CSortTokenComment) {
-        if (_getline(p->csort, p->buf_view->data, 512, p->line_counter) < 0) {
+        if (_getline(p->csort, p->static_buf_begin, 512, p->line_counter) < 0) {
             *(p->tok) = CSortToken_mk(p->tok->tok_view, CSortTokenEnd, 0, 0, 0);
         } else {
             *(p->buf_view) = SV(p->buf_view->data);
@@ -486,7 +484,7 @@ CSort_sortit(CSort* csort) {
     }
 
     String_View buf_view = SV(buf);
-    _ParseInfo parse_info = _ParseInfo_mk(csort, &initial_tok, &buf_view, &buf_view, &line_counter);
+    _ParseInfo parse_info = _ParseInfo_mk(csort, &initial_tok, SV_begin(buf_view), &buf_view, &line_counter);
 
     while (tok = _update_token(&parse_info), tok->type != CSortTokenEnd) {
         if (tok->type == CSortTokenImport) {

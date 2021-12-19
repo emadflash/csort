@@ -17,6 +17,6 @@ struct CSortConfig {
 
 
 extern int CSortConfig_init(CSortConfig* config, CSortMemArena* arena, const char* config_file_lua);
-extern int CSortConfig_free(CSortConfig* config);
+extern inline int CSortConfig_free(CSortConfig* config);
 
 #endif

@@ -16,7 +16,7 @@ CSortConfig_init(CSortConfig* config, CSortMemArena* arena, const char* config_f
     return 0;
 }
 
-int
+inline int
 CSortConfig_free(CSortConfig* config) {
     lua_close(config->lua);
 }
