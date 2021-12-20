@@ -215,6 +215,7 @@ CSort_loadConfig(CSort* csort) {
     lua_State* lua = csort->conf.lua;
 
     conf->squash_for_duplicate_library = _optBool(csort, lua, "squash_for_duplicate_library");
+    conf->disable_wrapping = _optBool(csort, lua, "disable_wrapping");
     conf->wrap_after_n_imports = _optNum(csort, lua, "wrap_after_n_imports");
     conf->import_on_each_wrap = _optNum(csort, lua, "import_on_each_wrap");
     conf->wrap_after_col = _optNum(csort, lua, "wrap_after_col");
@@ -581,6 +582,21 @@ wrap_imports(const CSortConfig* conf, CSortModuleObjNode* m, const u32* import_o
 }
 
 
+internal void
+_nowrap_imports(CSortModuleObjNode* module) {
+    CSortMemArenaNode** str_node;
+    for (u32 i = 0; i < module->imports.len - 1; ++i) {
+        str_node = (CSortMemArenaNode**) DynArray_get(&module->imports, i);
+        fprintf(stdout, "%s, ", (char*) (*str_node)->mem);
+    }
+
+    str_node = (CSortMemArenaNode**) DynArray_get(&module->imports, module->imports.len - 1);
+    fprintf(stdout, "%s", (char*) (*str_node)->mem);
+    fputc('\n', stdout);
+    return;
+}
+
+
 // prints processed/formatted imports
 void
 CSort_print_imports(const CSort* csort) {
@@ -599,17 +615,12 @@ CSort_print_imports(const CSort* csort) {
         }
 
         _sort_imports(module);
-        if (conf->wrap_after_n_imports && module->imports.len > conf->wrap_after_n_imports) {
-            wrap_imports(conf, module, &import_offset);
+        if (! conf->disable_wrapping) {
+            if (conf->wrap_after_n_imports && module->imports.len > conf->wrap_after_n_imports) {
+                wrap_imports(conf, module, &import_offset);
+            } else _nowrap_imports(module);
         } else {
-            for (u32 i = 0; i < module->imports.len - 1; ++i) {
-                str_node = (CSortMemArenaNode**) DynArray_get(&module->imports, i);
-                fprintf(stdout, "%s, ", (char*) (*str_node)->mem);
-            }
-
-            str_node = (CSortMemArenaNode**) DynArray_get(&module->imports, module->imports.len - 1);
-            fprintf(stdout, "%s", (char*) (*str_node)->mem);
-            fputc('\n', stdout);
+            _nowrap_imports(module);
         }
     }
 }

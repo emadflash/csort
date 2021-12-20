@@ -6,11 +6,14 @@
 --
 squash_for_duplicate_library = true;
 
+-- disable wrapping
+disable_wrapping = false;
+
 
 -- works with imports using `from`
 --
 wrap_after_n_imports = 4;        -- set to 0 if no wrap needed
-import_on_each_wrap = 12;         -- if the imports are less the `import_on_each_wrap` this will print all of them in a single
+import_on_each_wrap = 5;         -- if the imports are less the `import_on_each_wrap` this will print all of them in a single
 wrap_after_col = 50;
 
 -- It will wrap libs making sure they don't exceed this col
