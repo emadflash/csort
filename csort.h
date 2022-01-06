@@ -71,6 +71,7 @@ enum CSortTokenType {
     CSortTokenComma,
     CSortTokenSpace,
     CSortTokenIdentifier,
+    CSortTokenString,
     CSortTokenNewline,
     CSortTokenStart,
     CSortTokenEnd,
@@ -131,7 +132,6 @@ _ParseInfo_mk(CSort* csort, CSortToken* tok) {
     p.tok = tok;
     p.buf_view = SV_buff(p.buf, 0);
     p.line_counter = 0;
-
     return p;
 }
 
