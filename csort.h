@@ -32,6 +32,7 @@ struct CSortModuleObjNode {
     
     CSortModuleObjNode*  prev;
     CSortModuleObjNode*  next;
+    u32 line_in_file;
 };
 
 extern int _compare_cstr_nodes(const CSortMemArenaNode** n1, const CSortMemArenaNode** n2);
@@ -41,19 +42,22 @@ extern int _compare_cstr_nodes(const CSortMemArenaNode** n1, const CSortMemArena
 // --------------------------------------------------------------------------------------------
 typedef struct CSort CSort;
 struct CSort {
-    FILE* file;
-    String_View fileName;
+    FILE* input_file;
+    const char* file_to_sort;
 
     CSortMemArena arena;
-    CSortConfig configManager;
+    CSortConfig conf;
 
     CSortModuleObjNode* modules_curr_node, * modules;
 };
 
-extern inline CSort CSort_mk(const String_View fileName, FILE* file, const char* luaConfig);
+
+extern inline CSort CSort_mk(const char* file_to_sort, const char* lua_config);
 extern inline void CSort_free(CSort* csort);
 extern inline void CSort_panic(CSort* csort, const char* msg, ...);
+extern void CSort_load_config(CSort* csort);
 extern void CSort_sortit(CSort* csort);
+extern void CSort_do(const CSort* csort);
 
 
 #define CSortAssert(X, Y)                 \
@@ -70,6 +74,7 @@ enum CSortTokenType {
     CSortTokenComma,
     CSortTokenSpace,
     CSortTokenIdentifier,
+    CSortTokenString,
     CSortTokenNewline,
     CSortTokenStart,
     CSortTokenEnd,
@@ -130,7 +135,6 @@ _ParseInfo_mk(CSort* csort, CSortToken* tok) {
     p.tok = tok;
     p.buf_view = SV_buff(p.buf, 0);
     p.line_counter = 0;
-
     return p;
 }
 

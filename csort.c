@@ -49,7 +49,8 @@ CSortModuleObjNode_free(CSort* csort, CSortModuleObjNode* n) {
 
 // --------------------------------------------------------------------------------------------
 internal void
-CSort_append_module(CSort* csort, CSortModuleObjNode* module_node) {
+CSort_append_module(CSort* csort, CSortModuleObjNode* module_node, u32 line_in_file) {
+    module_node->line_in_file = line_in_file;
     if (! csort->modules_curr_node) {
         csort->modules_curr_node = module_node;
         csort->modules_curr_node->next = NULL;
@@ -112,15 +113,18 @@ _sort_imports(CSortModuleObjNode* n) {
 // 
 // --------------------------------------------------------------------------------------------
 inline CSort
-CSort_mk(const String_View fileName, FILE* file, const char* luaConfig) {
+CSort_mk(const char* file_to_sort, const char* lua_config) {
     CSort csort = {0};
-    csort.fileName = fileName;
-    csort.file = file;
+    csort.file_to_sort = file_to_sort;
+    csort.input_file = DEV_fopen(file_to_sort, "r");
     csort.arena = CSortMemArena_mk();
     csort.modules = csort.modules_curr_node = NULL;
 
-    if (CSortConfig_init(&csort.configManager, &csort.arena, luaConfig) < 0) {
-        CSort_panic(&csort, "Cannot load deafult config file: %s", luaConfig);
+    if (! lua_config) {
+        CSortConfig_init(&csort.conf, &csort.arena);
+    } else {
+        CSortConfig_init_w_lua(&csort.conf, &csort.arena, lua_config);
+        CSort_load_config(&csort);
     }
     return csort;
 }
@@ -130,8 +134,7 @@ inline void
 CSort_free(CSort* csort) {
     CSort_modules_free(csort);
     CSortMemArena_free(&(csort->arena));
-    CSortConfig_free(&csort->configManager);
-    fclose(csort->file);
+    CSortConfig_free(&csort->conf);
 }
 
 
@@ -171,12 +174,14 @@ CSort_panic_tok(CSort* csort, const CSortToken* tok, const char* msg, ...) {
 
 // These errors occur at UnExpected Newline or a comment
 internal inline void
-CSort_report_unexpected_errs(CSort* csort, const CSortToken* tok) {
+CSort_report_unexpected_errs(CSort* csort, const CSortToken* tok, const char* expected_token_type) {
+#define _unexpected_error(X, ...)\
+    case (X):\
+        CSort_panic_tok(csort, tok, __VA_ARGS__)
+
     switch (tok->type) {
-        case CSortTokenNewline:
-            CSort_panic_tok(csort, tok, "UnExpected newline");
-        case CSortTokenComment:
-            CSort_panic_tok(csort, tok, "UnExpected comment");
+        _unexpected_error(CSortTokenNewline, "Expected %s, got newline", expected_token_type);
+        _unexpected_error(CSortTokenComment, "Expected %s, got comment", expected_token_type);
     }
 }
 
@@ -187,9 +192,44 @@ CSort_report_unexpected_errs(CSort* csort, const CSortToken* tok) {
 // Lua Config
 // 
 // --------------------------------------------------------------------------------------------
+internal inline bool
+_optBool(CSort* csort, lua_State* luaCtx, const char* opt) {
+    lua_getglobal(luaCtx, opt);
+    CSortAssert(csort, (lua_type(luaCtx, -1) == LUA_TBOOLEAN));
+    return lua_toboolean(luaCtx, -1) ? true : false;
+}
+
+internal inline u32
+_optNum(CSort* csort, lua_State* luaCtx, const char* opt) {
+    lua_getglobal(luaCtx, opt);
+    CSortAssert(csort, (lua_type(luaCtx, -1) == LUA_TNUMBER));
+    return lua_tonumber(luaCtx, -1);
+}
+
+
+internal inline bool
+_is_nil(const CSort* csort, const char* opt) {\
+    lua_State* luaCtx = csort->conf.lua;
+    lua_getglobal(luaCtx, opt);
+    return DEV_bool(lua_type(luaCtx, -1) == LUA_TNIL);
+}
+
+void
+CSort_load_config(CSort* csort) {
+    CSortConfig* conf = &csort->conf;
+    lua_State* lua = csort->conf.lua;
+
+    conf->squash_for_duplicate_library = _optBool(csort, lua, "squash_for_duplicate_library");
+    conf->disable_wrapping = _optBool(csort, lua, "disable_wrapping");
+    conf->wrap_after_n_imports = _optNum(csort, lua, "wrap_after_n_imports");
+    conf->import_on_each_wrap = _optNum(csort, lua, "import_on_each_wrap");
+    conf->wrap_after_col = _optNum(csort, lua, "wrap_after_col");
+}
+
+
 internal bool
 CSort_findInKnowLibrarys(CSort* csort, const String_View library_view) {
-    lua_State* luaCtx = csort->configManager.lua;
+    lua_State* luaCtx = csort->conf.lua;
     
     lua_getglobal(luaCtx, "know_standard_library");
     if (! lua_istable(luaCtx, -1)) {
@@ -212,16 +252,6 @@ CSort_findInKnowLibrarys(CSort* csort, const String_View library_view) {
 
     return false;
 }
-
-
-internal bool
-CSortConfig_booleanOption(CSort* csort, const char* opt) {
-    lua_State* luaCtx = csort->configManager.lua;
-    lua_getglobal(luaCtx, opt);
-    CSortAssert(csort, (lua_type(luaCtx, -1) == LUA_TBOOLEAN));
-    return lua_toboolean(luaCtx, -1) ? true : false;
-}
-
 
 
 // --------------------------------------------------------------------------------------------
@@ -361,7 +391,7 @@ _search_import_from_statement(CSortModuleObjNode* n, const String_View* tok_view
 internal int
 _getline(_ParseInfo* p) {
     bzero(p->buf, 512);
-    if (! fgets(p->buf, 512, p->csort->file)) {
+    if (! fgets(p->buf, 512, p->csort->input_file)) {
         return -1;
     }
     p->line_counter += 1;
@@ -371,9 +401,8 @@ _getline(_ParseInfo* p) {
 
 internal inline const CSortToken*
 _update_token(_ParseInfo* p) {
-    p->prev_tok_type = p->tok->type;
     *(p->tok) = CSort_nexttoken(p);
-    if (p->tok->type == CSortTokenNewline || p->tok->type == CSortTokenComment) {
+    if (p->tok->type == CSortTokenNewline || p->tok->type == CSortTokenComment || p->tok->type == CSortTokenStart) {
         if (_getline(p) < 0) {
             *(p->tok) = CSortToken_mk(p->tok->tok_view, CSortTokenEnd, 0, 0, 0);
         } else {
@@ -404,7 +433,7 @@ _parse_import_statement_with_duplicate_check(CSort* csort, _ParseInfo* parse_inf
     do {
         tok =_update_token(parse_info);
         if (tok->type != CSortTokenIdentifier) {
-            CSort_report_unexpected_errs(csort, tok);
+            CSort_report_unexpected_errs(csort, tok, "module");
             CSort_panic_tok(csort, tok, "Expected module got '%*.s'", SV_len(tok->tok_view), SV_data(tok->tok_view));
         }
 
@@ -446,7 +475,7 @@ _parse_import_after_from(CSort* csort, _ParseInfo* parse_info, CSortModuleObjNod
     do {
         tok = _update_token(parse_info);
         if (tok->type != CSortTokenIdentifier) {
-            CSort_report_unexpected_errs(csort, tok);
+            CSort_report_unexpected_errs(csort, tok, "module");
             CSort_panic_tok(csort, tok, "Expected module got '%*.s'", SV_len(tok->tok_view), SV_data(tok->tok_view));
         }
 
@@ -466,27 +495,24 @@ CSort_sortit(CSort* csort) {
 
     CSortToken initial_tok = CSortToken_mk_initial();
     _ParseInfo parse_info = _ParseInfo_mk(csort, &initial_tok);
-    if (_getline(&parse_info) < 0) {
-        CSort_panic(csort, "file empty!");
-    }
 
     while (tok = _update_token(&parse_info), tok->type != CSortTokenEnd) {
         if (tok->type == CSortTokenImport) {
             bool is_already_kept;
             CSortModuleObjNode* _import = _parse_import_statement_with_duplicate_check(csort, &parse_info, &is_already_kept);
             if (! is_already_kept) {
-                CSort_append_module(csort, _import);
+                CSort_append_module(csort, _import, parse_info.line_counter);
             }
         } else if (tok->type == CSortTokenFrom) {
             tok = _update_token(&parse_info);
 
             if (tok->type != CSortTokenIdentifier) {
-                CSort_report_unexpected_errs(csort, tok);
+                CSort_report_unexpected_errs(csort, tok, "module");
                 CSort_panic_tok(csort, tok, "Expected module got '%.*s'", SV_len(tok->tok_view), SV_data(tok->tok_view));
             } else {
                 bool is_already_kept = false;
                 CSortModuleObjNode* _from_import;
-                if (CSortConfig_booleanOption(csort, "squash_for_duplicate_library")) {
+                if (csort->conf.squash_for_duplicate_library) {
                     _from_import = _search_for_module(csort, &tok->tok_view);
                     if (! _from_import) {
                         _from_import = CSortModuleObjNode_mk(csort, &tok->tok_view, NULL, CSortModuleKind_FROM);
@@ -503,7 +529,7 @@ CSort_sortit(CSort* csort) {
 
                 _parse_import_after_from(csort, &parse_info, _from_import);
                 if (! is_already_kept) {
-                    CSort_append_module(csort, _from_import);
+                    CSort_append_module(csort, _from_import, parse_info.line_counter);
                 }
             }
         }
@@ -511,26 +537,94 @@ CSort_sortit(CSort* csort) {
 }
 
 
+
+// --------------------------------------------------------------------------------------------
+//
+// Print sorted imports
+//
+// --------------------------------------------------------------------------------------------
+
+#define get_imports_start_line(X) ((X)->modules->line_in_file - 1)
+#define _buffer_whitespace(X, Y) fprintf((X), "%*c", (Y), ' ')
+#define _buffer_newline(X, Y) (fputs("\n", (X)), _buffer_whitespace(X, Y))
+
+internal void
+nowrap_imports(FILE* fp, CSortModuleObjNode* module) {
+    CSortMemArenaNode** str_node;
+    for (u32 i = 0; i < module->imports.len - 1; ++i) {
+        str_node = (CSortMemArenaNode**) DynArray_get(&module->imports, i);
+        fprintf(fp, "%s, ", (char*) (*str_node)->mem);
+    }
+
+    str_node = (CSortMemArenaNode**) DynArray_get(&module->imports, module->imports.len - 1);
+    fprintf(fp, "%s", (char*) (*str_node)->mem);
+    fputc('\n', fp);
+    return;
+}
+
+
+internal void
+wrap_imports(FILE* fp, const CSortConfig* conf, CSortModuleObjNode* m, const u32* import_offset) {
+    u32 count = 0;
+    CSortMemArenaNode** str_node;
+
+    fputc('(', fp);
+    for (; count < conf->wrap_after_n_imports; ++count) {
+        str_node = (CSortMemArenaNode**) DynArray_get(&m->imports, count);
+        fprintf(fp, "%s, ", (char*) (*str_node)->mem);
+    }
+
+    u32 remaining = m->imports.len - count;
+    assert(conf->import_on_each_wrap != 0);
+    while (remaining > conf->import_on_each_wrap) {
+        _buffer_newline(fp, *import_offset);
+        FOR (i, conf->import_on_each_wrap) {
+            str_node = (CSortMemArenaNode**) DynArray_get(&m->imports, count + i);
+            fprintf(fp, "%s, ", (char*) (*str_node)->mem);
+        }
+
+        remaining -= conf->import_on_each_wrap;
+        count += conf->import_on_each_wrap;
+    }
+
+    // print remaining imports which weren't wrapped
+    _buffer_newline(fp, *import_offset);
+    for (; count < m->imports.len - 1; ++count) {
+        str_node = (CSortMemArenaNode**) DynArray_get(&m->imports, count);
+        fprintf(fp, "%s, ", (char*) (*str_node)->mem);
+    }
+    str_node = (CSortMemArenaNode**) DynArray_get(&m->imports, m->imports.len - 1);
+    fprintf(fp, "%s)", (char*) (*str_node)->mem);
+    fputc('\n', fp);
+}
+
+
 // prints processed/formatted imports
 void
-CSort_print_imports(const CSort* csort) {
+CSort_do(const CSort* csort) {
+    FILE* output_file = stdout;
+    /*FILE* output_file = DEV_fopen(csort->file_to_sort, "wa");*/
+
+    const CSortConfig* conf = &csort->conf;
     CSortMemArenaNode** str_node;
+
     for (CSortModuleObjNode* ptr = csort->modules, * module = ptr; ptr; module = ptr) {
         ptr = ptr->next;
+        u32 import_offset = -3;                // Get offset little bit where the import keywords start!
+
         if (module->module_kind == CSortModuleKind_FROM) {
-            fprintf(stdout, "from %s import ", (char*) module->title->mem);
+            import_offset += fprintf(output_file, "from %s import ", (char*) module->title->mem);
         } else if (module->module_kind == CSortModuleKind_IMPORT) {
-            fprintf(stdout, "import ");
+            import_offset += fprintf(output_file, "import ");
         }
 
         _sort_imports(module);
-        for (u32 i = 0; i < module->imports.len - 1; ++i) {
-            str_node = (CSortMemArenaNode**) DynArray_get(&module->imports, i);
-            fprintf(stdout, "%s, ", (char*) (*str_node)->mem);
+        if (! conf->disable_wrapping) {
+            if (conf->wrap_after_n_imports && module->imports.len > conf->wrap_after_n_imports) {
+                wrap_imports(output_file, conf, module, &import_offset);
+            } else nowrap_imports(output_file, module);
+        } else {
+            nowrap_imports(output_file, module);
         }
-
-        str_node = (CSortMemArenaNode**) DynArray_get(&module->imports, module->imports.len - 1);
-        fprintf(stdout, "%s", (char*) (*str_node)->mem);
-        fputc('\n', stdout);
     }
 }

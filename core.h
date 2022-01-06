@@ -46,7 +46,7 @@ typedef double f64;
 #define DEV_bool(EXPR) ((EXPR) ? true : false)
 #define DEV_panic(X) (eprintln("panic:"#X), exit(1))
 
-#define FOR(X, Y) for (int (X) = 0; (X) < (Y); ++(X))
+#define FOR(X, Y) for (u32 (X) = 0; (X) < (Y); ++(X))
 
 // --------------------------------------------------------------------------------------------
 // ~utilites

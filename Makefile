@@ -1,40 +1,26 @@
-CC = gcc
-CFLAGS = -Wall -g -pedantic -fsanitize=address -std=c99
-RELEASE_CFLAGS = -std=c99 -O2
-BUILD_DIR = ./build
-CHECK_BIN = $(BUILD_DIR)/check
-BUILD_RELEASE = $(BUILD_DIR)/csort-release
-EXEC = $(BUILD_DIR)/csort
+cc = gcc
+cflags = -Wall -g -pedantic -fsanitize=address -std=c99
+build_dir = ./build
+exec = $(build_dir)/csort
+objs = core.o config.o csort.o
 
-run: $(EXEC)
-	$(EXEC)
+$(exec): main.c core.c config.c csort.c
+	$(cc) $(cflags) $^ -o $@ ./external/lua/liblua54.so -lm
 
-run_test: check
-	$(CHECK_BIN)
+$(build_dir)/csort.o: csort.c
+	$(cc) $(cflags) -c $^ -o $@
 
-debug: $(EXEC)
-	gdb -q $(EXEC)
-
-debug_test: $(CHECK_BIN)
-	gdb -q $(CHECK_BIN)
-
-release: main.c core.c config.c csort.c
-	$(CC) $(RELEASE_CFLAGS) $^ -o $(BUILD_RELEASE) ./external/lua/liblua54.so -lm
-
-$(EXEC): main.c core.c config.c csort.c
-	$(CC) $(CFLAGS) $^ -o $@ ./external/lua/liblua54.so -lm
-
-$(BUILD_DIR)/csort.o: csort.c
-	$(CC) $(CFLAGS) -c $^ -o $@
-
-$(BUILD_DIR)/config.o: config.c
-	$(CC) $(CFLAGS) -c $^ -o $@
+$(build_dir)/config.o: config.c
+	$(cc) $(cflags) -c $^ -o $@
 
 check: test/check.c core.c config.c csort.c
-	$(CC) $(CFLAGS) $^ -o $(CHECK_BIN) ./external/lua/liblua54.so -lm
+	$(cc) $(cflags) $^ -o $(build_dir)/check ./external/lua/liblua54.so -lm
 
-$(BUILD_DIR)/core.o: core.c
-	$(CC) $(CFLAGS) -c $^ -o $@
+debug: $(exec)
+	gdb -q $(exec)
+
+debug_test: $(build_dir)/check
+	gdb -q $(build_dir)/check
 
 clean:
-	rm -rf build
+	rm -rf build/*
