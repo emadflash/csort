@@ -42,8 +42,8 @@ extern int _compare_cstr_nodes(const CSortMemArenaNode** n1, const CSortMemArena
 // --------------------------------------------------------------------------------------------
 typedef struct CSort CSort;
 struct CSort {
-    FILE* file;
-    String_View fileName;
+    FILE* input_file;
+    const char* file_to_sort;
 
     CSortMemArena arena;
     CSortConfig conf;
@@ -52,10 +52,10 @@ struct CSort {
 };
 
 
-extern inline CSort CSort_mk(const String_View fileName, FILE* file, const char* luaConfig);
+extern inline CSort CSort_mk(const char* file_to_sort, const char* lua_config);
 extern inline void CSort_free(CSort* csort);
 extern inline void CSort_panic(CSort* csort, const char* msg, ...);
-extern void CSort_loadConfig(CSort* csort);
+extern void CSort_load_config(CSort* csort);
 extern void CSort_sortit(CSort* csort);
 extern void CSort_do(const CSort* csort);
 

@@ -7,12 +7,11 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#define CURR_CONFIG ".csortconfig"
-#define CONFIG_LUA_DEFAULT "config.lua"
+#define csort_config_usr ".csortconfig"
 
 internal inline char*
 _config_file_to_load(void) {
-    return  DEV_bool(access(CURR_CONFIG, F_OK) < 0) ? CONFIG_LUA_DEFAULT : CURR_CONFIG;
+    return DEV_bool(access(csort_config_usr, F_OK) < 0) ? NULL : csort_config_usr;
 }
 
 
@@ -25,14 +24,7 @@ int main(int argc, char* argv[]) {
     }
 
     const char* fileName = argv[1];
-    FILE* fp = fopen(fileName, "r");
-    if (! fp) {
-        eprintln("error: failed to open '%s'", fileName);
-        exit(1);
-    }
-
-    CSort csort = CSort_mk(SV(fileName), fp, _config_file_to_load());
-    CSort_loadConfig(&csort);
+    CSort csort = CSort_mk(fileName, _config_file_to_load());
     CSort_sortit(&csort);
     CSort_do(&csort);
     CSort_free(&csort);
