@@ -12,7 +12,7 @@ $ ./build/csort
 usage: csort {FILE}
 ```
 
-*csort* looks for user settings in `.csortconfig` in currenty directory
+*csort* looks for user settings in `.csortconfig` in current directory
 otherwise default settings are used
 
-For settings options look into `.csortconfig` provided
+For settings options look into *[.csortconfig](.csortconfig)*
