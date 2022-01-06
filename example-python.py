@@ -1,4 +1,4 @@
-from my_lib import Object           # error here, not taking Object while displaying my_lib imports
+from my_lib import Object
 
 import os
 

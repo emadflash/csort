@@ -49,7 +49,8 @@ CSortModuleObjNode_free(CSort* csort, CSortModuleObjNode* n) {
 
 // --------------------------------------------------------------------------------------------
 internal void
-CSort_append_module(CSort* csort, CSortModuleObjNode* module_node) {
+CSort_append_module(CSort* csort, CSortModuleObjNode* module_node, u32 line_in_file) {
+    module_node->line_in_file = line_in_file;
     if (! csort->modules_curr_node) {
         csort->modules_curr_node = module_node;
         csort->modules_curr_node->next = NULL;
@@ -398,9 +399,8 @@ _getline(_ParseInfo* p) {
 
 internal inline const CSortToken*
 _update_token(_ParseInfo* p) {
-    p->prev_tok_type = p->tok->type;
     *(p->tok) = CSort_nexttoken(p);
-    if (p->tok->type == CSortTokenNewline || p->tok->type == CSortTokenComment) {
+    if (p->tok->type == CSortTokenNewline || p->tok->type == CSortTokenComment || p->tok->type == CSortTokenStart) {
         if (_getline(p) < 0) {
             *(p->tok) = CSortToken_mk(p->tok->tok_view, CSortTokenEnd, 0, 0, 0);
         } else {
@@ -493,16 +493,13 @@ CSort_sortit(CSort* csort) {
 
     CSortToken initial_tok = CSortToken_mk_initial();
     _ParseInfo parse_info = _ParseInfo_mk(csort, &initial_tok);
-    if (_getline(&parse_info) < 0) {
-        CSort_panic(csort, "file empty!");
-    }
 
     while (tok = _update_token(&parse_info), tok->type != CSortTokenEnd) {
         if (tok->type == CSortTokenImport) {
             bool is_already_kept;
             CSortModuleObjNode* _import = _parse_import_statement_with_duplicate_check(csort, &parse_info, &is_already_kept);
             if (! is_already_kept) {
-                CSort_append_module(csort, _import);
+                CSort_append_module(csort, _import, parse_info.line_counter);
             }
         } else if (tok->type == CSortTokenFrom) {
             tok = _update_token(&parse_info);
@@ -530,7 +527,7 @@ CSort_sortit(CSort* csort) {
 
                 _parse_import_after_from(csort, &parse_info, _from_import);
                 if (! is_already_kept) {
-                    CSort_append_module(csort, _from_import);
+                    CSort_append_module(csort, _from_import, parse_info.line_counter);
                 }
             }
         }
@@ -545,6 +542,7 @@ CSort_sortit(CSort* csort) {
 //
 // --------------------------------------------------------------------------------------------
 
+#define get_imports_start_line(X) ((X)->modules->line_in_file - 1)
 #define _buffer_whitespace(X, Y) fprintf((X), "%*c", (Y), ' ')
 #define _buffer_newline(X, Y) (fputs("\n", (X)), _buffer_whitespace(X, Y))
 
@@ -601,7 +599,7 @@ wrap_imports(const CSortConfig* conf, CSortModuleObjNode* m, const u32* import_o
 
 // prints processed/formatted imports
 void
-CSort_print_imports(const CSort* csort) {
+CSort_do(const CSort* csort) {
     const CSortConfig* conf = &csort->conf;
     CSortMemArenaNode** str_node;
 

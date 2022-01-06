@@ -32,6 +32,7 @@ struct CSortModuleObjNode {
     
     CSortModuleObjNode*  prev;
     CSortModuleObjNode*  next;
+    u32 line_in_file;
 };
 
 extern int _compare_cstr_nodes(const CSortMemArenaNode** n1, const CSortMemArenaNode** n2);
@@ -50,11 +51,13 @@ struct CSort {
     CSortModuleObjNode* modules_curr_node, * modules;
 };
 
+
 extern inline CSort CSort_mk(const String_View fileName, FILE* file, const char* luaConfig);
 extern inline void CSort_free(CSort* csort);
 extern inline void CSort_panic(CSort* csort, const char* msg, ...);
 extern void CSort_loadConfig(CSort* csort);
 extern void CSort_sortit(CSort* csort);
+extern void CSort_do(const CSort* csort);
 
 
 #define CSortAssert(X, Y)                 \
