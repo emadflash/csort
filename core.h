@@ -168,6 +168,7 @@ internal int string_fill(String* s, char* string, u32 string_length);
 extern String string(char* buf, u32 len);
 extern inline void string_free(String* s);
 extern String string_slice(const char* begin, const char* end);
+extern int string_strncmp(const String* s1, const String* s2);
 extern String_View SV_fromString(const String* s);
 extern String_View string_toSV(const String* s);
 

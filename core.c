@@ -97,8 +97,9 @@ CSortMemArenaNode_free(CSortMemArenaNode* node) {
 void
 CSortMemArenaNode_fill(CSortMemArenaNode* node, void* data, u32 data_size) {
     if (data_size >= node->mem_free) {
-        node->mem_size += data_size;
+        node->mem_size += node->mem_free += (data_size + 512);
         node->mem = (void*) DEV_realloc(node->mem, 1, node->mem_size);
+        node->mem_cursor = node->mem + node->mem_used;
     }
 
     memcpy(node->mem_cursor, data, data_size);
@@ -333,6 +334,11 @@ string_slice(const char* begin, const char* end) {
     string_fill(&s, begin, end - begin);
 
     return s;
+}
+
+int
+string_strncmp(const String* s1, const String* s2) {
+    return strncmp(s1->data, s2->data, s2->len);
 }
 
 String_View

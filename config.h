@@ -241,7 +241,6 @@ struct CSortConfigCmd {
     bool show_after_sort;
 };
 
-
 // --------------------------------------------------------------------------------------------
 typedef struct CSortConfig CSortConfig;
 struct CSortConfig {
@@ -249,7 +248,7 @@ struct CSortConfig {
     lua_State* lua;
     CSortConfigCmd cmd_options;             // Options which are read from cmdline
 
-    char** know_standard_library;
+    DynArray know_standard_library;
     bool squash_for_duplicate_library,
          disable_wrapping;
     u64 wrap_after_n_imports,
@@ -260,6 +259,7 @@ struct CSortConfig {
 
 extern int CSortConfig_init(CSortConfig* config, CSortMemArena* arena);
 extern int CSortConfig_init_w_lua(CSortConfig* config, CSortMemArena* arena, const char* config_file_lua);
-extern inline int CSortConfig_free(CSortConfig* config);
+extern inline bool CSortConfig_findInKnowLibrarys(const CSortConfig* conf, const String_View library_view);
+extern inline void CSortConfig_free(CSortConfig* config);
 
 #endif

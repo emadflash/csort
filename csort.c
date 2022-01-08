@@ -307,38 +307,27 @@ CSort_load_config(CSort* csort) {
     CSortConfig* conf = &csort->conf;
     lua_State* lua = csort->conf.lua;
 
+    // load strings in know_standard_library into memory
+    lua_getglobal(lua, "know_standard_library");
+    if (! lua_istable(lua, -1)) {
+        CSort_panic(csort, "%s, Expected type LUA_TTABLE got %s ???", "know_standard_library", luaL_typename(lua, -1));
+    }
+
+    lua_pushnil(lua);
+    while (lua_next(lua, -2) != 0) {
+        CSortAssert(csort, (lua_type(lua, -1) == LUA_TSTRING));
+        const char* str = lua_tostring(lua, -1);
+        const String lib = string((char*) str, strlen(str));
+        DynArray_push(&conf->know_standard_library, (void*) &lib);
+        lua_pop(lua, 1);
+    }
+    qsort(conf->know_standard_library.mem, conf->know_standard_library.len, sizeof(String), string_strncmp);
+
     conf->squash_for_duplicate_library = _optBool(csort, lua, "squash_for_duplicate_library");
     conf->disable_wrapping = _optBool(csort, lua, "disable_wrapping");
     conf->wrap_after_n_imports = _optNum(csort, lua, "wrap_after_n_imports");
     conf->import_on_each_wrap = _optNum(csort, lua, "import_on_each_wrap");
     conf->wrap_after_col = _optNum(csort, lua, "wrap_after_col");
-}
-
-
-internal bool
-CSort_findInKnowLibrarys(CSort* csort, const String_View library_view) {
-    lua_State* luaCtx = csort->conf.lua;
-    
-    lua_getglobal(luaCtx, "know_standard_library");
-    if (! lua_istable(luaCtx, -1)) {
-        CSort_panic(csort, "%s, Expected type LUA_TTABLE got %s ???", "know_standard_library", luaL_typename(luaCtx, -1));
-    }
-
-    
-    // TODO(emf): figure out a "fast" way to save or search in know_standard_library lists
-    lua_pushnil(luaCtx);
-    String_View lua_str_view = {0};
-    while (lua_next(luaCtx, -2) != 0) {
-        CSortAssert(csort, (lua_type(luaCtx, -1) == LUA_TSTRING));
-        lua_str_view = SV(lua_tostring(luaCtx, -1));
-        if (SV_isEq(library_view, lua_str_view)) {
-            return true;
-        }
-
-        lua_pop(luaCtx, 1);
-    }
-
-    return false;
 }
 
 

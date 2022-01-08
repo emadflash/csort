@@ -53,8 +53,8 @@ int main(int argc, char* argv[]) {
     }
 
     CSortOptParse(argc - 1, &argv[2], options, options_len, "usage: csort [FILE] [options..]");
-
     CSort_init_target(&csort, fileName);
+
     CSort_sortit(&csort);
     CSort_do(&csort);
     CSort_free(&csort);
