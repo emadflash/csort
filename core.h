@@ -9,7 +9,6 @@
 #define internal static
 #define varPersist static
 #define varGlobal static
-#define bsize unsigned int
 
 
 // --------------------------------------------------------------------------------------------
@@ -52,8 +51,8 @@ typedef double f64;
 // ~utilites
 extern void die(char *fmt, ...);
 extern FILE* DEV_fopen(const char* file, const char* mode);
-extern void* DEV_malloc(bsize chunk_size, bsize chunk_len);
-extern void* DEV_realloc(void* prev, bsize chunk_size, bsize chunk_len); 
+extern void* DEV_malloc(u32 chunk_size, u32 chunk_len);
+extern void* DEV_realloc(void* prev, u32 chunk_size, u32 chunk_len); 
 extern int DEV_strToInt(const char* str, u64* strInt, int base);
 
 
@@ -136,11 +135,11 @@ extern char* str_findFirstNotOfPredRev(char* begin, char* end, int (*predicate)(
 typedef struct String_View String_View;
 struct String_View {
     char* data;
-    bsize len;
+    u32 len;
 };
 
 extern String_View SV(const char* data);
-extern String_View SV_buff(char* data, bsize len);
+extern String_View SV_buff(char* data, u32 len);
 extern inline String_View SV_slice(char* first, char* last);
 extern String_View SV_chop(String_View sv, char c);
 extern String_View SV_chop_backward(String_View sv, char c);
@@ -151,10 +150,10 @@ extern String_View SV_chop_backward(String_View sv, char c);
 typedef struct String String;
 struct String {
     char* data;
-    bsize len;
-    bsize memory_size;
-    bsize memory_filled;
-    bsize memory_left;
+    u32 len;
+    u32 memory_size;
+    u32 memory_filled;
+    u32 memory_left;
 };
 
 
@@ -162,11 +161,11 @@ struct String {
 #define string_raw(X) string((X), strlen((X)))
 #define string_fromSV(X) string((X).data, (X).len)
 
-internal void string_alloc(String* s, bsize required_length);
-internal void string_realloc(String* s, bsize required_length);
-internal int string_fill(String* s, char* string, bsize string_length);
+internal void string_alloc(String* s, u32 required_length);
+internal void string_realloc(String* s, u32 required_length);
+internal int string_fill(String* s, char* string, u32 string_length);
 
-extern String string(char* buf, bsize len);
+extern String string(char* buf, u32 len);
 extern inline void string_free(String* s);
 extern String string_slice(const char* begin, const char* end);
 extern String_View SV_fromString(const String* s);

@@ -27,13 +27,13 @@ FILE* DEV_fopen(const char* file, const char* mode) {
     return fp;
 }
 
-void* DEV_malloc(bsize chunk_size, bsize chunk_len) {
+void* DEV_malloc(u32 chunk_size, u32 chunk_len) {
     void* buff = malloc(chunk_size * chunk_len);
     if (! buff) die("malloc");
     return buff;
 }
 
-void* DEV_realloc(void* prev, bsize chunk_size, bsize chunk_len) {
+void* DEV_realloc(void* prev, u32 chunk_size, u32 chunk_len) {
     void* buff = realloc(prev, chunk_size* chunk_len);
     if (! buff) die("realloc");
     return buff;
@@ -72,6 +72,15 @@ void DEV_println(FILE* fp, char* fmt, ...) {
 // ~memory arena node 
 void
 CSortMemArenaNode_init(CSortMemArenaNode* node) {
+    node->mem_size = 512;
+    node->mem = (void*) DEV_malloc(node->mem_size, 1);
+    node->mem_cursor = (u8*) node->mem;
+    node->mem_free = 512;
+    node->mem_used = 0;
+}
+
+void
+CSortMemArenaNode_init_w_size(CSortMemArenaNode* node, u32 size) {
     node->mem_size = 512;
     node->mem = (void*) DEV_malloc(node->mem_size, 1);
     node->mem_cursor = (u8*) node->mem;
@@ -235,7 +244,7 @@ String_View SV(const char* data) {
     };
 }
 
-String_View SV_buff(char* data, bsize len) {
+String_View SV_buff(char* data, u32 len) {
     return (String_View) {
         .data = data,
         .len = len,
@@ -277,21 +286,21 @@ String_View SV_chop_backward(String_View sv, char c) {
 // --------------------------------------------------------------------------------------------
 // ~String
 internal void
-string_alloc(String* s, bsize required_length) {
+string_alloc(String* s, u32 required_length) {
     s->len = s->memory_filled = 0;
     s->memory_size = s->memory_left = required_length + (1<<4);
     s->data = (char*) DEV_malloc(s->memory_size, sizeof(char));
 }
 
 internal void
-string_realloc(String* s, bsize required_length) {
+string_realloc(String* s, u32 required_length) {
     assert(required_length > s->memory_left);
     s->memory_size += required_length + (1<<6);
     s->data = (char*) DEV_malloc(s->memory_size, sizeof(char));
 }
 
 internal int
-string_fill(String* s, char* string, bsize string_length) {
+string_fill(String* s, char* string, u32 string_length) {
     if (string_length >= s->memory_left) {
         return -1;
     }
@@ -305,7 +314,7 @@ string_fill(String* s, char* string, bsize string_length) {
 }
 
 inline String
-string(char* buf, bsize len) {
+string(char* buf, u32 len) {
     String s;
     string_alloc(&s, len);
     string_fill(&s, buf, len);

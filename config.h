@@ -236,15 +236,23 @@ internal char know_standard_library[512][256] = {
 
 
 // --------------------------------------------------------------------------------------------
+typedef struct CSortConfigCmd CSortConfigCmd;
+struct CSortConfigCmd {
+    bool show_after_sort;
+};
+
+
+// --------------------------------------------------------------------------------------------
 typedef struct CSortConfig CSortConfig;
 struct CSortConfig {
     CSortMemArena* arena;
     lua_State* lua;
+    CSortConfigCmd cmd_options;             // Options which are read from cmdline
 
     char** know_standard_library;
     bool squash_for_duplicate_library,
          disable_wrapping;
-    u32 wrap_after_n_imports,
+    u64 wrap_after_n_imports,
         import_on_each_wrap,
         wrap_after_col;
 };

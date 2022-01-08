@@ -9,6 +9,86 @@
 
 
 
+
+// --------------------------------------------------------------------------------------------
+//
+// CSortOpt
+//
+// --------------------------------------------------------------------------------------------
+typedef_CSortOpt(u64, Int)
+typedef_CSortOpt(char, Str)
+typedef_CSortOpt(bool, Bool)
+
+internal CSortOptObj*
+CSortOptObj_from_options(CSortOptObj* options, u32 options_len, const char* arg) {
+    FOR (i, options_len) {
+        if (DEV_strIsEq(options[i].short_flag, arg) || DEV_strIsEq(options[i].long_flag, arg)) {
+            return &options[i]; 
+        }
+    }
+    return NULL;
+}
+
+
+// prints description about options in @param(output_stream)
+void
+CSortOptParse_show_usage(FILE* output_stream, const CSortOptObj* options, u32 options_len) {
+#define GetType(X) (((X)->Int) ? "Int" : (((X)->Str) ? "Str" : (((X)->Bool) ? "Bool" : "NONE")))
+    fprintf(stderr, "options: \n\n");
+
+    FOR (i, options_len) {
+        const CSortOptObj* obj = &options[i];
+        fprintf(output_stream, "  %s| %s: [%s]\n", obj->short_flag, obj->long_flag, GetType(obj));
+        fprintf(output_stream, "    %s\n\n", obj->about);
+    }
+}
+
+
+void
+CSortOptParse(int argc, char* argv[], CSortOptObj* options, u32 options_len, const char* prepend_error_msg) {
+#define error(...)        \
+    eprintln(__VA_ARGS__);\
+    exit(1);
+
+    u32 arg_counter = 0;
+    char* arg = argv[arg_counter];
+    CSortOptObj* obj;
+
+    while (arg = argv[arg_counter++], arg) {
+        if (CSortOptParse_is_help_flag(arg)) {
+            eprintln(prepend_error_msg);
+            CSortOptParse_show_usage(stderr, options, options_len);
+            exit(1);
+        }
+
+        if (obj = CSortOptObj_from_options(options, options_len, arg), obj) {
+            if (obj->Int) {
+                arg = argv[arg_counter++];
+                if (arg) {
+                    if (DEV_strToInt(arg, obj->Int, 10) < 0) {
+                        error("error: '%s': Expected a integer, got %s", obj->long_flag, arg);
+                    }
+                } else error("error: '%s': Expected a integer, got newline", obj->long_flag);
+            }
+
+            if (obj->Str) {
+                arg = argv[arg_counter++];
+                if (arg) {
+                    obj->Str = arg;
+                } else error("error: '%s': Expected a string, got newline", obj->long_flag);
+            }
+
+            if (obj->Bool) {
+                *obj->Bool = (*obj->Bool) ? false : true;
+            }
+        } else {
+            error("error: '%s': UnKnown thing", arg);
+        }
+    }
+}
+
+
+
 // --------------------------------------------------------------------------------------------
 //
 // Module functions 
@@ -112,21 +192,29 @@ _sort_imports(CSortModuleObjNode* n) {
 // General CSort Setup
 // 
 // --------------------------------------------------------------------------------------------
-inline CSort
-CSort_mk(const char* file_to_sort, const char* lua_config) {
+CSort
+CSort_mk() {
     CSort csort = {0};
-    csort.file_to_sort = file_to_sort;
-    csort.input_file = DEV_fopen(file_to_sort, "r");
     csort.arena = CSortMemArena_mk();
     csort.modules = csort.modules_curr_node = NULL;
-
-    if (! lua_config) {
-        CSortConfig_init(&csort.conf, &csort.arena);
-    } else {
-        CSortConfig_init_w_lua(&csort.conf, &csort.arena, lua_config);
-        CSort_load_config(&csort);
-    }
     return csort;
+}
+
+inline void
+CSort_init_target(CSort* csort, const char* file_to_sort) {
+    csort->file_to_sort = file_to_sort;
+    csort->input_file = DEV_fopen(file_to_sort, "r");
+}
+
+
+inline void
+CSort_init_config(CSort* csort, const char* lua_config) {
+    if (! lua_config) {
+        CSortConfig_init(&csort->conf, &csort->arena);
+    } else {
+        CSortConfig_init_w_lua(&csort->conf, &csort->arena, lua_config);
+        CSort_load_config(csort);
+    }
 }
 
 
@@ -603,7 +691,11 @@ wrap_imports(FILE* fp, const CSortConfig* conf, CSortModuleObjNode* m, const u32
 void
 CSort_do(const CSort* csort) {
     FILE* output_file = stdout;
-    /*FILE* output_file = DEV_fopen(csort->file_to_sort, "wa");*/
+    if (csort->conf.cmd_options.show_after_sort) {
+        output_file = stdout;
+    } else {
+        return;
+    }
 
     const CSortConfig* conf = &csort->conf;
     CSortMemArenaNode** str_node;

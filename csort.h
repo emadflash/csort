@@ -13,6 +13,50 @@
 
 
 
+
+// --------------------------------------------------------------------------------------------
+//
+// CSortOpt
+//
+// --------------------------------------------------------------------------------------------
+typedef struct CSortOptObj CSortOptObj;
+struct CSortOptObj {
+    char* short_flag, *long_flag, *about;
+    char* Str;
+    u64* Int;
+    bool* Bool;
+};
+
+
+#define CSortOptParse_is_help_flag(arg) (DEV_strIsEq(arg, "--help") || DEV_strIsEq(arg, "-h"))
+#define declare_CSortOpt()\
+extern CSortOptObj CSortOptInt(CSort* csort, u64* data_ptr, const char* long_flag, const char* short_flag, const char* about);\
+extern CSortOptObj CSortOptBool(CSort* csort, bool* data_ptr, const char* long_flag, const char* short_flag, const char* about);\
+extern CSortOptObj CSortOptStr(CSort* csort, char* data_ptr, const char* long_flag, const char* short_flag, const char* about)\
+
+#define typedef_CSortOpt(dataType, T)                                                                            \
+CSortOptObj                                                                                                      \
+CSortOpt##T(CSort* csort, dataType* data_ptr, const char* long_flag, const char* short_flag, const char* about) {\
+    CSortOptObj opt = {0};                                                                                       \
+    opt.long_flag = long_flag;                                                                                   \
+    opt.short_flag = short_flag;                                                                                 \
+    opt.about = about;                                                                                           \
+    opt.Int = NULL;                                                                                              \
+    opt.Str = NULL;                                                                                              \
+    opt.Bool = NULL;                                                                                             \
+    opt.T = data_ptr;                                                                                            \
+    return opt;                                                                                                  \
+}
+
+extern void CSortOptParse_show_usage(FILE* output_stream, const CSortOptObj* options, u32 options_len);
+extern void CSortOptParse(int argc, char* argv[], CSortOptObj* options, u32 options_len, const char* prepend_error_msg);
+
+
+
+// --------------------------------------------------------------------------------------------
+//
+// Module struct, Tokenzier
+//
 // --------------------------------------------------------------------------------------------
 enum CSortModuleKind {
     CSortModuleKind_FROM,
@@ -52,12 +96,18 @@ struct CSort {
 };
 
 
-extern inline CSort CSort_mk(const char* file_to_sort, const char* lua_config);
+extern CSort CSort_mk();
+extern inline void CSort_init_target(CSort* csort, const char* file_to_sort);
+extern inline void CSort_init_config(CSort* csort, const char* lua_config);
 extern inline void CSort_free(CSort* csort);
 extern inline void CSort_panic(CSort* csort, const char* msg, ...);
 extern void CSort_load_config(CSort* csort);
 extern void CSort_sortit(CSort* csort);
 extern void CSort_do(const CSort* csort);
+
+
+// Declare CSortOpt functions defined by @macro(typedef_CSortOpt)
+declare_CSortOpt();
 
 
 #define CSortAssert(X, Y)                 \
