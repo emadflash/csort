@@ -10,11 +10,11 @@ squash_for_duplicate_library = true;
 disable_wrapping = false;
 
 -- enable on these file formats
-file_formats = { ".py" };
+file_exts = { ".py" };
 
--- skip directories
+-- skip these directories, if '-r' flag is used.
+-- These are skipped when we are iterating the whole directory
 skip_directories = { "build", ".git" };
-
 
 -- works with imports using `from`
 --
@@ -24,7 +24,6 @@ wrap_after_col = 50;
 
 -- It will wrap libs making sure they don't exceed this col
 wrap_after_col = 80;
-
 
 -- List of standard library
 -- Copied from `isort's` list using `isort --show-config`

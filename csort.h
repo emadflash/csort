@@ -9,6 +9,7 @@
 #include "external/lua/lauxlib.h"
 
 #include <stdio.h>
+#include <errno.h>
 #include <assert.h>
 
 
@@ -48,8 +49,8 @@ CSortOpt##T(CSort* csort, dataType* data_ptr, const char* long_flag, const char*
     return opt;                                                                                                  \
 }
 
-extern void CSortOptParse_show_usage(FILE* output_stream, const CSortOptObj* options, u32 options_len);
-extern void CSortOptParse(int argc, char* argv[], CSortOptObj* options, u32 options_len, const char* prepend_error_msg);
+void CSortOptParse_show_usage(FILE* output_stream, const CSortOptObj* options, u32 options_len);
+void CSortOptParse(int argc, char* argv[], CSortOptObj* options, u32 options_len, const char* prepend_error_msg);
 
 
 
@@ -79,7 +80,7 @@ struct CSortModuleObjNode {
     u32 line_in_file;
 };
 
-extern int _compare_cstr_nodes(const CSortMemArenaNode** n1, const CSortMemArenaNode** n2);
+int _compare_cstr_nodes(const CSortMemArenaNode** n1, const CSortMemArenaNode** n2);
 
 
 
@@ -90,7 +91,7 @@ struct CSort {
     CSortConfig conf;
 };
 
-extern CSort CSort_mk();
+CSort CSort_mk();
 extern inline void CSort_init_config(CSort* csort, const char* lua_config);
 extern inline void CSort_deinit(CSort* csort);
 extern inline void CSort_panic(CSort* csort, const char* msg, ...);
@@ -114,25 +115,17 @@ extern void CSortEntity_deinit(CSortEntity* entity);
 
 
 // --------------------------------------------------------------------------------------------
-typedef struct CSortDir CSortDir;
-struct CSortDir {
-    CSort* csort;
-    const char* input_filepath;
-};
-
-extern CSortDir CSortDir_mk(CSort* csort, const char* input_filepath);
-extern bool CSortDir_is_directory(CSort* csort, const char* filepath);
-extern void CSortDir_recur(CSortDir* dir);
+int CSortGetExtension(const String_View sv, String_View* ext);
+String CSortAppendPath(const char* path, const char* add);
+void CSortPerformOnFileCallback(CSort* csort, char* input_path, void (callback)(CSort* csort, const char* file_path, const char* file_name));
 
 // Declare CSortOpt functions defined by @macro(typedef_CSortOpt)
 declare_CSortOpt();
-
 
 #define CSortAssert(X, Y)                 \
     if (! Y) {                            \
         CSort_panic(X, "assertion error");\
     }
-
 
 
 // --------------------------------------------------------------------------------------------

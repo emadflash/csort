@@ -107,6 +107,7 @@ extern inline CSortMemArenaNode* CSortMemArenaCopyCStr(CSortMemArena* arena, cha
 // --------------------------------------------------------------------------------------------
 // ~str utilities
 extern char* str_find(char* begin, char* end, char c);
+extern char* str_findRev(char* begin, char* end, char c);
 extern char* str_findFirstNotOf(char* begin, char* end, char c);
 extern char* str_findFirstNotOfRev(char* begin, char* end, char c);
 extern char* str_findPredRev(char* begin, char* end, int (*predicate)(int));
@@ -125,6 +126,7 @@ extern char* str_findFirstNotOfPredRev(char* begin, char* end, int (*predicate)(
 #define SV_isEq(X, Y) DEV_strIsEqN((X).data, (X).len, (Y).data, (Y).len)
 #define SV_isEqRaw(X, Y) DEV_strIsEqN((X).data, (X).len, (Y), strlen((Y)))
 #define SV_find(X, Y) str_find(SV_begin(X), SV_end(X), Y)
+#define SV_rfind(X, Y) str_findRev(SV_begin(X), SV_end(X), Y)
 #define SV_findPred(X, Y) str_find(SV_begin(X), SV_end(X), Y)
 #define SV_findPredRev(X, Y) str_findPredRev(SV_begin(X), SV_end(X), Y)
 #define SV_findFirstNotOf(X, Y) str_findFirstNotOf(SV_begin(X), SV_end(X), Y)

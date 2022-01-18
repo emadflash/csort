@@ -3,15 +3,12 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <ctype.h>
-#include <errno.h>
 #include <dirent.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
 #define CSORT_MAX(X, Y) ((X) > (Y) ? 1 : 0)
 #define CSORT_MIN(X, Y) ((X) < (Y) ? 1 : 0)
-
-
 
 
 // --------------------------------------------------------------------------------------------
@@ -94,67 +91,47 @@ CSortOptParse(int argc, char* argv[], CSortOptObj* options, u32 options_len, con
 
 // --------------------------------------------------------------------------------------------
 //
-// CSortDir
+// Directory listing
 //
 // --------------------------------------------------------------------------------------------
-CSortDir
-CSortDir_mk(CSort* csort, const char* input_filepath) {
-    CSortDir dir = {0};
-    dir.csort = csort;
-    dir.input_filepath = input_filepath;
-    return dir;
+int
+CSortGetExtension(const String_View sv, String_View* ext) {
+    char* e = SV_rfind(sv, '.');
+    // @cleanup: Change str_findPredRev, the Big Rev to say #str_rfindpredicate
+    // Discard #sv if it begins with a '.' (dot)
+    if (e && e != SV_begin(sv)) {
+        *ext = SV_slice(e, SV_end(sv));
+        return 0;
+    }
+    return -1;
 }
 
-internal inline void
-CSortDir_reset(CSortDir* dir, const char* input_filepath) {
-    dir->input_filepath = input_filepath;
-}
-
-internal String
-CSortDir_path_append(const char* path, const char* add) {
-    String p = string(path, strlen(path));
+String
+CSortAppendPath(const char* path, const char* add) {
+    String p = string((char*) path, strlen(path));
     string_append(&p, "/", 1);
-    string_append(&p, add, strlen(add));
+    string_append(&p, (char*) add, strlen(add));
     return p;
 }
 
-bool
-CSortDir_is_directory(CSort* csort, const char* filepath) {
-    struct stat file_stat;
-    if (stat(filepath, &file_stat) < 0) {
-        CSort_panic(&csort, "CSortDir_is_directory: stat failed: %s: %s", filepath, strerror(errno));
-    } 
-    return ((file_stat.st_mode & S_IFMT) == S_IFDIR) ? true : false;
-}
-
 void
-/*CSortDir_recur(CSortDir* dir, void (callback)(const CSortDir* dir)) {*/
-CSortDir_recur(CSortDir* dir) {
-    DIR* dirp = opendir(dir->input_filepath);
-    if (! dirp) CSort_panic(dir->csort, "CSortDir_recur: opendir: could not open: %s", dir->input_filepath);
+CSortPerformOnFileCallback(CSort* csort, char* input_path, void (callback)(CSort* csort, const char* file_path, const char* file_name)) {
+    DIR* dirp = opendir(input_path);
+    if (! dirp) CSort_panic(csort, "CSortDir_recur: opendir: could not open: %s", input_path);
 
     struct dirent* d;
     while ((d = readdir(dirp))) {
-        if (! (DEV_strIsEq(d->d_name, ".") || DEV_strIsEq(d->d_name, ".."))) {
-#ifdef _DIRENT_HAVE_D_TYPE
-#error "fuck you"
+        if (! DEV_strIsEq(d->d_name, "..") && ! DEV_strIsEq(d->d_name, ".")) {
+#ifndef _DIRENT_HAVE_D_TYPE
+#error "Requires _DIRENT_HAVE_D_TYPE, to check if #dirent is a directory"
 #endif
-            if (CSortDir_is_directory(dir->csort, string_cstr(&pstr))) {
-                String pstr = CSortDir_path_append(dir->input_filepath, d->d_name);
-                println("%s", pstr.data);
-                CSortDir_reset(dir, string_cstr(&pstr));
-                CSortDir_recur(dir);
-                string_free(&pstr);
+            // We just looking at regular files
+            if (d->d_type == DT_REG) {
+                callback(csort, input_path, d->d_name);
             }
         }
     }
 }
-
-void
-CSortDir_deinit(CSortDir* dir) {
-}
-
-
 
 // --------------------------------------------------------------------------------------------
 //
@@ -294,7 +271,7 @@ CSort_init_config(CSort* csort, const char* lua_config) {
 inline void
 CSort_deinit(CSort* csort) {
     CSortMemArena_free(&(csort->arena));
-    CSortConfig_free(&csort->conf);
+    CSortConfig_deinit(&csort->conf);
 }
 
 
@@ -305,7 +282,6 @@ CSort_panic(CSort* csort, const char* msg, ...) {
     va_start(ap, msg);
     vfprintf(stderr, msg, ap);
     va_end(ap);
-
     putc('\n', stderr);
     CSort_deinit(csort);
     exit(1);
@@ -380,23 +356,22 @@ CSort_load_config(CSort* csort) {
     lua_State* lua = csort->conf.lua;
 
     // load strings in know_standard_library into memory
-    lua_getglobal(lua, "know_standard_library");
-    if (! lua_istable(lua, -1)) {
+    if (array_push_from_str(&conf->know_standard_library, lua, "know_standard_library") < 0) {
         CSort_panic(csort, "%s, Expected type LUA_TTABLE got %s ???", "know_standard_library", luaL_typename(lua, -1));
-    }
-
-    lua_pushnil(lua);
-    while (lua_next(lua, -2) != 0) {
-        CSortAssert(csort, (lua_type(lua, -1) == LUA_TSTRING));
-        const char* str = lua_tostring(lua, -1);
-        const String lib = string((char*) str, strlen(str));
-        DynArray_push(&conf->know_standard_library, (void*) &lib);
-        lua_pop(lua, 1);
     }
     qsort(conf->know_standard_library.mem, conf->know_standard_library.len, sizeof(String), string_strncmp);
 
     // load strings in skip_directories into memory
-    array_push_from_str(&conf->skip_directories, lua, "skip_directories");
+    if (array_push_from_str(&conf->skip_directories, lua, "skip_directories") < 0) {
+        CSort_panic(csort, "%s, Expected type LUA_TTABLE got %s ???", "skip_directories", luaL_typename(lua, -1));
+    }
+    qsort(conf->skip_directories.mem, conf->skip_directories.len, sizeof(String), string_strncmp);
+
+    // load strings in #file_exts into memory
+    if (array_push_from_str(&conf->file_exts, lua, "file_exts") < 0) {
+        CSort_panic(csort, "%s, Expected type LUA_TTABLE got %s ???", "skip_directories", luaL_typename(lua, -1));
+    }
+    qsort(conf->file_exts.mem, conf->file_exts.len, sizeof(String), string_strncmp);
 
     conf->squash_for_duplicate_library = _optBool(csort, lua, "squash_for_duplicate_library");
     conf->disable_wrapping = _optBool(csort, lua, "disable_wrapping");

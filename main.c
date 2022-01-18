@@ -5,6 +5,8 @@
 
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #define csort_config_usr ".csortconfig"
 
@@ -30,6 +32,33 @@ CSort_update_config_via_cmd(CSort* csort, u32* options_len) {
     return (CSortOptObj*) mem->mem;
 }
 
+internal bool
+is_directory(CSort* csort, const char* filepath) {
+    struct stat file_stat;
+    if (stat(filepath, &file_stat) < 0) {
+        CSort_panic(&csort, "is_directory: stat failed: %s: %s", filepath, strerror(errno));
+    } 
+    return ((file_stat.st_mode & S_IFMT) == S_IFDIR) ? true : false;
+}
+
+internal void
+CSortHandlePyFile(CSort* csort, const char* input_filepath, const char* input_filename) {
+    String input_file = CSortAppendPath(input_filepath, input_filename);
+    const String_View input_file_sv = SV_fromString(&input_file);
+    String_View input_file_ext;
+    if (CSortGetExtension(input_file_sv, &input_file_ext) >= 0) {
+        if (CSortConfigFindStrList(&csort->conf, 2, input_file_ext)) {
+            println("%s:", input_file.data);
+            CSortEntity entity = CSortEntity_mk(csort, input_file.data);
+            CSortEntity_do(&entity);
+            CSortEntity_deinit(&entity);
+            println("");
+        }
+    }
+    string_free(&input_file);
+}
+
+
 // --------------------------------------------------------------------------------------------
 int main(int argc, char* argv[]) {
     CSort csort = CSort_mk();
@@ -52,17 +81,17 @@ int main(int argc, char* argv[]) {
     }
     CSortOptParse(argc - 1, &argv[2], options, options_len, "usage: csort [FILE] [options..]");
 
-    if (! CSortDir_is_directory(&csort, input_filepath)) {
+    if (! is_directory(&csort, input_filepath)) {
         CSortEntity entity = CSortEntity_mk(&csort, input_filepath);
         CSortEntity_do(&entity);
         CSortEntity_deinit(&entity);
     } else {
-        CSortDir dir = CSortDir_mk(&csort, input_filepath);
         if (csort.conf.cmd_options.recursive_apply) {
-            CSortDir_recur(&dir);
+            // TODO: Recur file system
+        } else {
+            CSortPerformOnFileCallback(&csort, input_filepath, CSortHandlePyFile);
         }
     }
-
     CSort_deinit(&csort);
     return 0;
 }

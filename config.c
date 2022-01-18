@@ -11,6 +11,7 @@ CSortConfig_init_w_lua(CSortConfig* config, CSortMemArena* arena, const char* co
     config->lua = luaL_newstate();
     config->know_standard_library = DynArray_mk(sizeof(String));
     config->skip_directories = DynArray_mk(sizeof(String));
+    config->file_exts = DynArray_mk(sizeof(String));
     int luaResult = luaL_dofile(config->lua, config_file_lua);
     if (luaResult != LUA_OK) {
         lua_close(config->lua);
@@ -32,6 +33,16 @@ CSortConfig_init(CSortConfig* config, CSortMemArena* arena) {
     qsort(config->know_standard_library.mem, config->know_standard_library.len, sizeof(String), string_strncmp);
 
     // skip_directories 
+    // @cleanup: Manual sort them and get rid of qsort
+    config->file_exts = DynArray_mk(sizeof(String));
+    FOR (i, file_exts_len) {
+        const char* str = file_exts[i];
+        const String file_ext = string((char*) str, strlen(str));
+        DynArray_push(&config->skip_directories, (void*) &file_ext);
+    }
+    qsort(config->file_exts.mem, config->file_exts.len, sizeof(String), string_strncmp);
+
+    // skip_directories 
     config->skip_directories = DynArray_mk(sizeof(String));
     FOR (i, skip_directories_len) {
         const char* str = skip_directories[i];
@@ -49,14 +60,31 @@ CSortConfig_init(CSortConfig* config, CSortMemArena* arena) {
     return 0;
 }
 
-inline bool
-CSortConfig_findInKnowLibrarys(const CSortConfig* conf, const String_View library_view) {
-    return (! bsearch(&library_view.data, conf->know_standard_library.mem, conf->know_standard_library.len, sizeof(String), string_strncmp))
+bool
+CSortConfigFindStrList(CSortConfig* conf, int which_list, const String_View match) {
+    assert(which_list >= 0 && which_list <= 2);
+
+    DynArray* list;
+    switch (which_list) {
+        case 0:
+            list = &conf->know_standard_library;
+            break;
+        case 1:
+            list = &conf->skip_directories;
+            break;
+        case 2:
+            list = &conf->file_exts;
+            break;
+        default:
+            // @cleanup: Get rid of this ugly assert for debugging
+            assert(false);
+    }
+    return (! bsearch(&match.data, list->mem, list->len, sizeof(String), string_strncmp))
         ? false : true;
 }
 
 void
-CSortConfig_free(CSortConfig* config) {
+CSortConfig_deinit(CSortConfig* config) {
     if (config->lua) lua_close(config->lua);
     FOR (i, config->know_standard_library.len) {
         String* s = (String*) DynArray_get(&config->know_standard_library, i);
@@ -66,8 +94,13 @@ CSortConfig_free(CSortConfig* config) {
         String* s = (String*) DynArray_get(&config->skip_directories, i);
         string_free(s);
     }
+    FOR (i, config->file_exts.len) {
+        String* s = (String*) DynArray_get(&config->file_exts, i);
+        string_free(s);
+    }
     DynArray_free(&config->know_standard_library);
     DynArray_free(&config->skip_directories);
+    DynArray_free(&config->file_exts);
 }
 
 int

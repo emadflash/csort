@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.15 FATAL_ERROR)
 
 set(CMAKE_C_STANDARD 99)
 set(PROJECT_NAME "csort")
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+set(CMAKE_C_FLAGS_DEBUG "-g -fsanitize=address -O0")
+set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG")
+
 project(${PROJECT_NAME} DESCRIPTION "import sorter for python")
 
 # Compile external/lua

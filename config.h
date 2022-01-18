@@ -243,6 +243,14 @@ internal char skip_directories[skip_directories_len][28] = {
     ".git",
 };
 
+/*
+ * List of @param(file_exts), on files with these extensions we will run #csort
+ */
+#define file_exts_len 1
+internal char file_exts[file_exts_len][22] = {
+    ".py"
+};
+
 
 // --------------------------------------------------------------------------------------------
 typedef struct CSortConfigCmd CSortConfigCmd;
@@ -258,7 +266,7 @@ struct CSortConfig {
     lua_State* lua;
     CSortConfigCmd cmd_options;             // Options which are read from cmdline
 
-    DynArray know_standard_library, skip_directories;
+    DynArray know_standard_library, skip_directories, file_exts;
     bool squash_for_duplicate_library,
          disable_wrapping;
     u64 wrap_after_n_imports,
@@ -269,8 +277,8 @@ struct CSortConfig {
 
 extern int CSortConfig_init(CSortConfig* config, CSortMemArena* arena);
 extern int CSortConfig_init_w_lua(CSortConfig* config, CSortMemArena* arena, const char* config_file_lua);
-extern inline bool CSortConfig_findInKnowLibrarys(const CSortConfig* conf, const String_View library_view);
-extern inline void CSortConfig_free(CSortConfig* config);
+extern bool CSortConfigFindStrList(CSortConfig* conf, int which_list, const String_View match);
+extern inline void CSortConfig_deinit(CSortConfig* config);
 extern int array_push_from_str(DynArray* array, lua_State* lua, const char* table_name);
 
 #endif
