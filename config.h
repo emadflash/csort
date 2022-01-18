@@ -248,6 +248,7 @@ internal char skip_directories[skip_directories_len][28] = {
 typedef struct CSortConfigCmd CSortConfigCmd;
 struct CSortConfigCmd {
     bool show_after_sort, recursive_apply;
+    char* input_filepath;
 };
 
 // --------------------------------------------------------------------------------------------

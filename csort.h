@@ -90,7 +90,14 @@ struct CSort {
     CSortConfig conf;
 };
 
+extern CSort CSort_mk();
+extern inline void CSort_init_config(CSort* csort, const char* lua_config);
+extern inline void CSort_deinit(CSort* csort);
+extern inline void CSort_panic(CSort* csort, const char* msg, ...);
+extern void CSort_load_config(CSort* csort);
 
+
+// --------------------------------------------------------------------------------------------
 typedef struct CSortEntity CSortEntity;
 struct CSortEntity {
     CSort* csort;
@@ -105,12 +112,17 @@ extern void CSortEntity_do(CSortEntity* entity);
 extern void CSortEntity_free(CSortEntity* entity);
 extern void CSortEntity_deinit(CSortEntity* entity);
 
-extern CSort CSort_mk();
-extern inline void CSort_init_config(CSort* csort, const char* lua_config);
-extern inline void CSort_deinit(CSort* csort);
-extern inline void CSort_panic(CSort* csort, const char* msg, ...);
-extern void CSort_load_config(CSort* csort);
 
+// --------------------------------------------------------------------------------------------
+typedef struct CSortDir CSortDir;
+struct CSortDir {
+    CSort* csort;
+    const char* input_filepath;
+};
+
+extern CSortDir CSortDir_mk(CSort* csort, const char* input_filepath);
+extern bool CSortDir_is_directory(CSort* csort, const char* filepath);
+extern void CSortDir_recur(CSortDir* dir);
 
 // Declare CSortOpt functions defined by @macro(typedef_CSortOpt)
 declare_CSortOpt();

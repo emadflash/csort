@@ -3,6 +3,10 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <ctype.h>
+#include <errno.h>
+#include <dirent.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #define CSORT_MAX(X, Y) ((X) > (Y) ? 1 : 0)
 #define CSORT_MIN(X, Y) ((X) < (Y) ? 1 : 0)
@@ -85,6 +89,69 @@ CSortOptParse(int argc, char* argv[], CSortOptObj* options, u32 options_len, con
             error("error: '%s': UnKnown thing", arg);
         }
     }
+}
+
+
+// --------------------------------------------------------------------------------------------
+//
+// CSortDir
+//
+// --------------------------------------------------------------------------------------------
+CSortDir
+CSortDir_mk(CSort* csort, const char* input_filepath) {
+    CSortDir dir = {0};
+    dir.csort = csort;
+    dir.input_filepath = input_filepath;
+    return dir;
+}
+
+internal inline void
+CSortDir_reset(CSortDir* dir, const char* input_filepath) {
+    dir->input_filepath = input_filepath;
+}
+
+internal String
+CSortDir_path_append(const char* path, const char* add) {
+    String p = string(path, strlen(path));
+    string_append(&p, "/", 1);
+    string_append(&p, add, strlen(add));
+    return p;
+}
+
+bool
+CSortDir_is_directory(CSort* csort, const char* filepath) {
+    struct stat file_stat;
+    if (stat(filepath, &file_stat) < 0) {
+        CSort_panic(&csort, "CSortDir_is_directory: stat failed: %s: %s", filepath, strerror(errno));
+    } 
+    return ((file_stat.st_mode & S_IFMT) == S_IFDIR) ? true : false;
+}
+
+void
+/*CSortDir_recur(CSortDir* dir, void (callback)(const CSortDir* dir)) {*/
+CSortDir_recur(CSortDir* dir) {
+    DIR* dirp = opendir(dir->input_filepath);
+    if (! dirp) CSort_panic(dir->csort, "CSortDir_recur: opendir: could not open: %s", dir->input_filepath);
+
+    struct dirent* d;
+    while ((d = readdir(dirp))) {
+        if (! (DEV_strIsEq(d->d_name, ".") || DEV_strIsEq(d->d_name, ".."))) {
+#ifdef _DIRENT_HAVE_D_TYPE
+#error "fuck you"
+#endif
+            if (CSortDir_is_directory(dir->csort, string_cstr(&pstr))) {
+                String pstr = CSortDir_path_append(dir->input_filepath, d->d_name);
+                println("%s", pstr.data);
+                CSortDir_reset(dir, string_cstr(&pstr));
+                CSortDir_recur(dir);
+                string_free(&pstr);
+            }
+        }
+    }
+}
+
+void
+CSortDir_deinit(CSortDir* dir) {
 }
 
 
@@ -719,3 +786,5 @@ CSortEntity_do(CSortEntity* entity) {
         }
     }
 }
+
+

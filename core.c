@@ -297,7 +297,7 @@ internal void
 string_realloc(String* s, u32 required_length) {
     assert(required_length > s->memory_left);
     s->memory_size += required_length + (1<<6);
-    s->data = (char*) DEV_malloc(s->memory_size, sizeof(char));
+    s->data = (char*) DEV_realloc(s->data, s->memory_size, sizeof(char));
 }
 
 internal int
@@ -312,6 +312,19 @@ string_fill(String* s, char* string, u32 string_length) {
     s->data[s->len] = '\0'; 
 
     return 0;
+}
+
+void
+string_append(String* s, char* string, u32 string_length) {
+    if (string_length >= s->memory_left) {
+        string_realloc(s, string_length);
+    }
+
+    memcpy(s->data + s->len, string, string_length);
+    s->len += string_length;
+    s->memory_filled = s->len + 1;
+    s->memory_left = s->memory_size - s->memory_filled;
+    s->data[s->len] = '\0'; 
 }
 
 inline String

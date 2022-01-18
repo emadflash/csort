@@ -20,7 +20,7 @@ CSort_update_config_via_cmd(CSort* csort, u32* options_len) {
     *options_len = 5;
     CSortOptObj options[] = {
         CSortOptBool(csort, &csort->conf.cmd_options.show_after_sort, "--show", "-s", "show changes after sanitizing"),
-        CSortOptBool(csort, &csort->conf.cmd_options.recursive_apply, "--recursive", "-r", "run on each file/directory"),
+        CSortOptBool(csort, &csort->conf.cmd_options.recursive_apply, "--recur", "-r", "recursively iterates the whole directory, vaild if supplied path is a directory"),
         CSortOptBool(csort, &csort->conf.disable_wrapping, "--disable-wrapping", "-dw", "disable wrapping for duplicate librarys"),
         CSortOptBool(csort, &csort->conf.squash_for_duplicate_library, "--no-squash-duplicates", "-sd", "disable squashing duplicate librarys"),
         CSortOptInt(csort, &csort->conf.wrap_after_n_imports, "--wrap-after", "-wa", "starts wrapping imports after n, imports")
@@ -29,7 +29,6 @@ CSort_update_config_via_cmd(CSort* csort, u32* options_len) {
     CSortMemArenaNode_fill(mem, options, sizeof(options));
     return (CSortOptObj*) mem->mem;
 }
-
 
 // --------------------------------------------------------------------------------------------
 int main(int argc, char* argv[]) {
@@ -45,19 +44,25 @@ int main(int argc, char* argv[]) {
         exit(1);
     }
 
-    const char* fileName = argv[1];
-    if (CSortOptParse_is_help_flag(fileName)) {
+    const char* input_filepath = argv[1];
+    if (CSortOptParse_is_help_flag(input_filepath)) {
         eprintln("usage: csort [FILE] [options..]");
         CSortOptParse_show_usage(stderr, options, options_len);
         exit(1);
     }
-
     CSortOptParse(argc - 1, &argv[2], options, options_len, "usage: csort [FILE] [options..]");
 
-    CSortEntity entity = CSortEntity_mk(&csort, fileName);
-    CSortEntity_do(&entity);
-    CSortEntity_deinit(&entity);
-    CSort_deinit(&csort);
+    if (! CSortDir_is_directory(&csort, input_filepath)) {
+        CSortEntity entity = CSortEntity_mk(&csort, input_filepath);
+        CSortEntity_do(&entity);
+        CSortEntity_deinit(&entity);
+    } else {
+        CSortDir dir = CSortDir_mk(&csort, input_filepath);
+        if (csort.conf.cmd_options.recursive_apply) {
+            CSortDir_recur(&dir);
+        }
+    }
 
+    CSort_deinit(&csort);
     return 0;
 }

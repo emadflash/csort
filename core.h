@@ -159,6 +159,7 @@ struct String {
 
 // ~macro functions
 #define string_raw(X) string((X), strlen((X)))
+#define string_cstr(X) (X)->data
 #define string_fromSV(X) string((X).data, (X).len)
 
 internal void string_alloc(String* s, u32 required_length);
@@ -167,6 +168,7 @@ internal int string_fill(String* s, char* string, u32 string_length);
 
 extern String string(char* buf, u32 len);
 extern inline void string_free(String* s);
+extern void string_append(String* s, char* string, u32 string_length);
 extern String string_slice(const char* begin, const char* end);
 extern int string_strncmp(const String* s1, const String* s2);
 extern String_View SV_fromString(const String* s);
