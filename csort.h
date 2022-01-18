@@ -4,9 +4,9 @@
 #include "core.h"
 #include "config.h"
 
-#include "external/lua/include/lua.h"
-#include "external/lua/include/lualib.h"
-#include "external/lua/include/lauxlib.h"
+#include "external/lua/lua.h"
+#include "external/lua/lualib.h"
+#include "external/lua/lauxlib.h"
 
 #include <stdio.h>
 #include <assert.h>

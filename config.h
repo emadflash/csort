@@ -2,9 +2,9 @@
 #define __CONFIG_H__
 
 #include "core.h"
-#include "external/lua/include/lua.h"
-#include "external/lua/include/lualib.h"
-#include "external/lua/include/lauxlib.h"
+#include "external/lua/lua.h"
+#include "external/lua/lualib.h"
+#include "external/lua/lauxlib.h"
 
 #include <stdbool.h>
 

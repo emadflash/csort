@@ -18,7 +18,7 @@ skip_directories = { "build", ".git" };
 
 -- works with imports using `from`
 --
-wrap_after_n_imports = 2;        -- set to 0 if no wrap needed
+wrap_after_n_imports = 3;        -- set to 0 if no wrap needed
 import_on_each_wrap = 9;         -- if the imports are less the `import_on_each_wrap` this will print all of them in a single
 wrap_after_col = 50;
 
