@@ -86,24 +86,30 @@ extern int _compare_cstr_nodes(const CSortMemArenaNode** n1, const CSortMemArena
 // --------------------------------------------------------------------------------------------
 typedef struct CSort CSort;
 struct CSort {
-    FILE* input_file;
-    const char* file_to_sort;
-
     CSortMemArena arena;
     CSortConfig conf;
+};
+
+
+typedef struct CSortEntity CSortEntity;
+struct CSortEntity {
+    CSort* csort;
+    FILE* input_file;
+    const char* file_to_sort;
 
     CSortModuleObjNode* modules_curr_node, * modules;
 };
 
+extern inline CSortEntity CSortEntity_mk(CSort* csort, const char* file_to_sort);
+extern void CSortEntity_do(CSortEntity* entity);
+extern void CSortEntity_free(CSortEntity* entity);
+extern void CSortEntity_deinit(CSortEntity* entity);
 
 extern CSort CSort_mk();
-extern inline void CSort_init_target(CSort* csort, const char* file_to_sort);
 extern inline void CSort_init_config(CSort* csort, const char* lua_config);
-extern inline void CSort_free(CSort* csort);
+extern inline void CSort_deinit(CSort* csort);
 extern inline void CSort_panic(CSort* csort, const char* msg, ...);
 extern void CSort_load_config(CSort* csort);
-extern void CSort_sortit(CSort* csort);
-extern void CSort_do(const CSort* csort);
 
 
 // Declare CSortOpt functions defined by @macro(typedef_CSortOpt)
@@ -168,7 +174,7 @@ CSortToken_mk_initial() {
 // --------------------------------------------------------------------------------------------
 typedef struct _ParseInfo _ParseInfo;
 struct _ParseInfo {
-    CSort*         csort;
+    CSortEntity*         entity;
     CSortToken*    tok;
     enum CSortTokenType prev_tok_type;
     char           buf[512];
@@ -178,9 +184,9 @@ struct _ParseInfo {
 
 
 internal inline _ParseInfo
-_ParseInfo_mk(CSort* csort, CSortToken* tok) {
+_ParseInfo_mk(CSortEntity* entity, CSortToken* tok) {
     _ParseInfo p = {0};
-    p.csort = csort;
+    p.entity = entity;
     p.prev_tok_type = CSortTokenStart;
     p.tok = tok;
     p.buf_view = SV_buff(p.buf, 0);

@@ -3,7 +3,6 @@
 #include "core.h"
 #include "csort.h"
 
-// Should we load config file present in current directory ?
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -18,9 +17,10 @@ _config_file_to_load(void) {
 internal CSortOptObj*
 CSort_update_config_via_cmd(CSort* csort, u32* options_len) {
     CSortMemArenaNode* mem = CSortMemArena_alloc(&csort->arena);
-    *options_len = 4;
+    *options_len = 5;
     CSortOptObj options[] = {
         CSortOptBool(csort, &csort->conf.cmd_options.show_after_sort, "--show", "-s", "show changes after sanitizing"),
+        CSortOptBool(csort, &csort->conf.cmd_options.recursive_apply, "--recursive", "-r", "run on each file/directory"),
         CSortOptBool(csort, &csort->conf.disable_wrapping, "--disable-wrapping", "-dw", "disable wrapping for duplicate librarys"),
         CSortOptBool(csort, &csort->conf.squash_for_duplicate_library, "--no-squash-duplicates", "-sd", "disable squashing duplicate librarys"),
         CSortOptInt(csort, &csort->conf.wrap_after_n_imports, "--wrap-after", "-wa", "starts wrapping imports after n, imports")
@@ -53,11 +53,11 @@ int main(int argc, char* argv[]) {
     }
 
     CSortOptParse(argc - 1, &argv[2], options, options_len, "usage: csort [FILE] [options..]");
-    CSort_init_target(&csort, fileName);
 
-    CSort_sortit(&csort);
-    CSort_do(&csort);
-    CSort_free(&csort);
+    CSortEntity entity = CSortEntity_mk(&csort, fileName);
+    CSortEntity_do(&entity);
+    CSortEntity_deinit(&entity);
+    CSort_deinit(&csort);
 
     return 0;
 }

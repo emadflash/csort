@@ -13,7 +13,7 @@
  * Copied from `isort's` list using `isort --show-config`
  */
 #define know_standard_library_len 218
-internal char know_standard_library[512][256] = {
+internal char know_standard_library[know_standard_library_len][256] = {
     "http",/*# {{{*/
     "os",
     "sre_compile",
@@ -234,11 +234,20 @@ internal char know_standard_library[512][256] = {
     "fileinput"/*# }}}*/
 };
 
+/*
+ * List of @param(skip_directories), which we'll skip while traversing filesystem
+ */
+#define skip_directories_len 2
+internal char skip_directories[skip_directories_len][28] = {
+    "build",
+    ".git",
+};
+
 
 // --------------------------------------------------------------------------------------------
 typedef struct CSortConfigCmd CSortConfigCmd;
 struct CSortConfigCmd {
-    bool show_after_sort;
+    bool show_after_sort, recursive_apply;
 };
 
 // --------------------------------------------------------------------------------------------
@@ -248,7 +257,7 @@ struct CSortConfig {
     lua_State* lua;
     CSortConfigCmd cmd_options;             // Options which are read from cmdline
 
-    DynArray know_standard_library;
+    DynArray know_standard_library, skip_directories;
     bool squash_for_duplicate_library,
          disable_wrapping;
     u64 wrap_after_n_imports,
@@ -261,5 +270,6 @@ extern int CSortConfig_init(CSortConfig* config, CSortMemArena* arena);
 extern int CSortConfig_init_w_lua(CSortConfig* config, CSortMemArena* arena, const char* config_file_lua);
 extern inline bool CSortConfig_findInKnowLibrarys(const CSortConfig* conf, const String_View library_view);
 extern inline void CSortConfig_free(CSortConfig* config);
+extern int array_push_from_str(DynArray* array, lua_State* lua, const char* table_name);
 
 #endif
