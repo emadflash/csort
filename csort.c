@@ -7,9 +7,21 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#ifndef _DIRENT_HAVE_D_TYPE
+#error "Requires _DIRENT_HAVE_D_TYPE, to check if #dirent is a directory."
+#endif
+
 #define CSORT_MAX(X, Y) ((X) > (Y) ? 1 : 0)
 #define CSORT_MIN(X, Y) ((X) < (Y) ? 1 : 0)
 
+void log_error(char* fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    fputs("error: ", stderr);
+    vfprintf(stderr, fmt, ap);
+    fputc('\n', stderr);
+    va_end(ap);
+}
 
 // --------------------------------------------------------------------------------------------
 //
@@ -97,7 +109,6 @@ CSortOptParse(int argc, char* argv[], CSortOptObj* options, u32 options_len, con
 int
 CSortGetExtension(const String_View sv, String_View* ext) {
     char* e = SV_rfind(sv, '.');
-    // @cleanup: Change str_findPredRev, the Big Rev to say #str_rfindpredicate
     // Discard #sv if it begins with a '.' (dot)
     if (e && e != SV_begin(sv)) {
         *ext = SV_slice(e, SV_end(sv));
@@ -106,31 +117,86 @@ CSortGetExtension(const String_View sv, String_View* ext) {
     return -1;
 }
 
-String
-CSortAppendPath(const char* path, const char* add) {
-    String p = string((char*) path, strlen(path));
-    string_append(&p, "/", 1);
-    string_append(&p, (char*) add, strlen(add));
-    return p;
+// get endpoint aka filename from #path
+// example: ./path/filename -> filename
+char*
+get_dir_endpoint(char* path, u32 len) {
+    char* e = path + len - 1;
+    for (; e != path - 1 &&  *e != '/'; --e) {
+    }
+    e += 1;
+    return e;
 }
 
-void
-CSortPerformOnFileCallback(CSort* csort, char* input_path, void (callback)(CSort* csort, const char* file_path, const char* file_name)) {
+// Append #to_add to #path and result is stored on the stack, I hope.
+int
+append_path(const char* path, const char* to_add, char* newpath, u32 len) {
+    const int newlen = strlen(path) + strlen(to_add) + 2;
+    if (len < newlen) {
+        return -1;
+    }
+    return snprintf(newpath, newlen, "%s/%s", path, to_add);
+}
+
+int
+CSortPerformOnFileCallback(CSort* csort, const char* input_path, void (callback)(CSort* csort, const char* file_path)) {
     DIR* dirp = opendir(input_path);
-    if (! dirp) CSort_panic(csort, "CSortDir_recur: opendir: could not open: %s", input_path);
+    if (! dirp) {
+        log_error("opendir: Could not open: %s: %s", input_path, strerror(errno));
+        closedir(dirp);
+        return -1;
+    }
 
     struct dirent* d;
     while ((d = readdir(dirp))) {
         if (! DEV_strIsEq(d->d_name, "..") && ! DEV_strIsEq(d->d_name, ".")) {
-#ifndef _DIRENT_HAVE_D_TYPE
-#error "Requires _DIRENT_HAVE_D_TYPE, to check if #dirent is a directory"
-#endif
-            // We just looking at regular files
             if (d->d_type == DT_REG) {
-                callback(csort, input_path, d->d_name);
+                char newpath[1024];
+                const int newpath_len =  append_path(input_path, d->d_name, newpath, 1024);
+                if (newpath_len < 0) {
+                    log_error("#newpath len exceeded the max len. Skipping file...: %s/%s", input_path, d->d_name);
+                    continue;
+                }
+                callback(csort, newpath);
             }
         }
     }
+    closedir(dirp);
+    return 0;
+}
+
+int
+CSortPerformOnFileCallbackRecur(CSort* csort, const char* input_path, void (callback)(CSort* csort, const char* input_filepath)) {
+    DIR* dirp = opendir(input_path);
+    if (! dirp) {
+        log_error("opendir: Could not open: %s: %s", input_path, strerror(errno));
+        closedir(dirp);
+        return -1;
+    }
+
+    struct dirent* d;
+    while ((d = readdir(dirp))) {
+        if (! DEV_strIsEq(d->d_name, "..") && ! DEV_strIsEq(d->d_name, ".")) {
+            char newpath[1024];
+            int newpath_len =  append_path(input_path, d->d_name, newpath, 1024);
+            if (newpath_len < 0) {
+                log_error("#newpath len exceeded the max len. Skipping file...: %s/%s", input_path, d->d_name);
+                continue;
+            }
+
+            if (d->d_type == DT_DIR) {
+                if (! CSortConfigFindStrList(&csort->conf, 1, get_dir_endpoint(newpath, newpath_len))) {
+                    CSortPerformOnFileCallbackRecur(csort, newpath, callback);
+                }
+            } else {
+                if (d->d_type == DT_REG) {
+                    callback(csort, newpath);
+                }
+            }
+        }
+    }
+    closedir(dirp);
+    return 0;
 }
 
 // --------------------------------------------------------------------------------------------
@@ -761,5 +827,3 @@ CSortEntity_do(CSortEntity* entity) {
         }
     }
 }
-
-

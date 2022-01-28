@@ -12,15 +12,6 @@
 
 
 // --------------------------------------------------------------------------------------------
-// ~Define function as internal in case of header file
-#ifdef __LS_HEADER__
-#   define function internal
-#else
-#   define function
-#endif
-
-
-// --------------------------------------------------------------------------------------------
 // ~Types
 typedef unsigned int uint;
 typedef uint8_t  u8;
@@ -54,6 +45,7 @@ extern FILE* DEV_fopen(const char* file, const char* mode);
 extern void* DEV_malloc(u32 chunk_size, u32 chunk_len);
 extern void* DEV_realloc(void* prev, u32 chunk_size, u32 chunk_len); 
 extern int DEV_strToInt(const char* str, u64* strInt, int base);
+void log_error(char* fmt, ...);
 
 
 // --------------------------------------------------------------------------------------------

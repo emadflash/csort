@@ -7,7 +7,6 @@
 #include <assert.h>
 #include <limits.h>
 
-
 // --------------------------------------------------------------------------------------------
 // ~utilites
 void die(char *fmt, ...) {
@@ -295,7 +294,7 @@ string_alloc(String* s, u32 required_length) {
 
 internal void
 string_realloc(String* s, u32 required_length) {
-    assert(required_length > s->memory_left);
+    assert(required_length >= s->memory_left);
     s->memory_size += required_length + (1<<6);
     s->data = (char*) DEV_realloc(s->data, s->memory_size, sizeof(char));
 }
@@ -352,7 +351,7 @@ string_slice(const char* begin, const char* end) {
 int
 string_strncmp(const String* s1, const String* s2) {
     return strncmp(s1->data, s2->data, s2->len);
-}
+} 
 
 String_View
 SV_fromString(const String* s) {

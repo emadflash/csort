@@ -15,7 +15,8 @@ _config_file_to_load(void) {
     return DEV_bool(access(csort_config_usr, F_OK) < 0) ? NULL : csort_config_usr;
 }
 
-
+// Make cmdline options attach to #CSortConfigCmd struct
+// So, when we parse, we update #CSortConfigCmd struct
 internal CSortOptObj*
 CSort_update_config_via_cmd(CSort* csort, u32* options_len) {
     CSortMemArenaNode* mem = CSortMemArena_alloc(&csort->arena);
@@ -32,30 +33,32 @@ CSort_update_config_via_cmd(CSort* csort, u32* options_len) {
     return (CSortOptObj*) mem->mem;
 }
 
-internal bool
-is_directory(CSort* csort, const char* filepath) {
+// check if #filepath is a directory.
+internal int
+is_directory(CSort* csort, const char* filepath, bool* success) {
     struct stat file_stat;
     if (stat(filepath, &file_stat) < 0) {
-        CSort_panic(&csort, "is_directory: stat failed: %s: %s", filepath, strerror(errno));
+        log_error("is_directory: stat failed: %s: %s", filepath, strerror(errno));
+        return -1;
     } 
-    return ((file_stat.st_mode & S_IFMT) == S_IFDIR) ? true : false;
+    *success = ((file_stat.st_mode & S_IFMT) == S_IFDIR) ? true : false;
+    return 0;
 }
 
+// Make entity for #input_filepath
+// This function is a callback.
 internal void
-CSortHandlePyFile(CSort* csort, const char* input_filepath, const char* input_filename) {
-    String input_file = CSortAppendPath(input_filepath, input_filename);
-    const String_View input_file_sv = SV_fromString(&input_file);
-    String_View input_file_ext;
-    if (CSortGetExtension(input_file_sv, &input_file_ext) >= 0) {
-        if (CSortConfigFindStrList(&csort->conf, 2, input_file_ext)) {
-            println("%s:", input_file.data);
-            CSortEntity entity = CSortEntity_mk(csort, input_file.data);
-            CSortEntity_do(&entity);
-            CSortEntity_deinit(&entity);
-            println("");
-        }
+CSortHandlePyFile(CSort* csort, const char* input_filepath) {
+    const String_View input_file_sv = SV(input_filepath);
+    String_View input_file_ext = {0};
+    if (CSortGetExtension(input_file_sv, &input_file_ext) == 0 &&
+        CSortConfigFindStrList(&csort->conf, 2, input_file_ext.data)) {
+        println("\033[1;31m%s:\033[0m", input_filepath);
+        CSortEntity entity = CSortEntity_mk(csort, input_filepath);
+        CSortEntity_do(&entity);
+        CSortEntity_deinit(&entity);
+        println("");
     }
-    string_free(&input_file);
 }
 
 
@@ -81,17 +84,25 @@ int main(int argc, char* argv[]) {
     }
     CSortOptParse(argc - 1, &argv[2], options, options_len, "usage: csort [FILE] [options..]");
 
-    if (! is_directory(&csort, input_filepath)) {
+    bool success = false;
+    if (is_directory(&csort, input_filepath, &success) < 0) {
+        log_error("csort: Couldn't check if %s is a directory.", input_filepath);
+        CSort_deinit(&csort);
+        exit(1);
+    }
+
+    if (! success) {
         CSortEntity entity = CSortEntity_mk(&csort, input_filepath);
         CSortEntity_do(&entity);
         CSortEntity_deinit(&entity);
     } else {
         if (csort.conf.cmd_options.recursive_apply) {
-            // TODO: Recur file system
+            CSortPerformOnFileCallbackRecur(&csort, input_filepath, CSortHandlePyFile);
         } else {
             CSortPerformOnFileCallback(&csort, input_filepath, CSortHandlePyFile);
         }
     }
+
     CSort_deinit(&csort);
     return 0;
 }

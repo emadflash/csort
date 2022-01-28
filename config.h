@@ -275,10 +275,10 @@ struct CSortConfig {
 };
 
 
-extern int CSortConfig_init(CSortConfig* config, CSortMemArena* arena);
-extern int CSortConfig_init_w_lua(CSortConfig* config, CSortMemArena* arena, const char* config_file_lua);
-extern bool CSortConfigFindStrList(CSortConfig* conf, int which_list, const String_View match);
-extern inline void CSortConfig_deinit(CSortConfig* config);
-extern int array_push_from_str(DynArray* array, lua_State* lua, const char* table_name);
+int CSortConfig_init(CSortConfig* config, CSortMemArena* arena);
+int CSortConfig_init_w_lua(CSortConfig* config, CSortMemArena* arena, const char* config_file_lua);
+void CSortConfig_deinit(CSortConfig* config);
+bool CSortConfigFindStrList(CSortConfig* conf, int which_list, const char* match);
+int array_push_from_str(DynArray* array, lua_State* lua, const char* table_name);
 
 #endif

@@ -2,7 +2,6 @@
 #include <assert.h>
 
 
-
 // --------------------------------------------------------------------------------------------
 int
 CSortConfig_init_w_lua(CSortConfig* config, CSortMemArena* arena, const char* config_file_lua) {
@@ -32,7 +31,7 @@ CSortConfig_init(CSortConfig* config, CSortMemArena* arena) {
     }
     qsort(config->know_standard_library.mem, config->know_standard_library.len, sizeof(String), string_strncmp);
 
-    // skip_directories 
+    // file_exts 
     // @cleanup: Manual sort them and get rid of qsort
     config->file_exts = DynArray_mk(sizeof(String));
     FOR (i, file_exts_len) {
@@ -61,9 +60,8 @@ CSortConfig_init(CSortConfig* config, CSortMemArena* arena) {
 }
 
 bool
-CSortConfigFindStrList(CSortConfig* conf, int which_list, const String_View match) {
+CSortConfigFindStrList(CSortConfig* conf, int which_list, const char* match) {
     assert(which_list >= 0 && which_list <= 2);
-
     DynArray* list;
     switch (which_list) {
         case 0:
@@ -76,11 +74,19 @@ CSortConfigFindStrList(CSortConfig* conf, int which_list, const String_View matc
             list = &conf->file_exts;
             break;
         default:
-            // @cleanup: Get rid of this ugly assert for debugging
             assert(false);
     }
-    return (! bsearch(&match.data, list->mem, list->len, sizeof(String), string_strncmp))
+
+    // FIXME It is also matching .pyc with .py
+    return (! bsearch(&match, list->mem, list->len, sizeof(String), string_strncmp))
         ? false : true;
+    /*FOR (i, list->len) {*/
+        /*String* s = DynArray_get(list, i);*/
+        /*if (DEV_strIsEq(s->data, match)) {*/
+            /*return true;*/
+        /*}*/
+    /*}*/
+    /*return false;*/
 }
 
 void

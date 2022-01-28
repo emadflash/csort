@@ -12,9 +12,6 @@
 #include <errno.h>
 #include <assert.h>
 
-
-
-
 // --------------------------------------------------------------------------------------------
 //
 // CSortOpt
@@ -116,8 +113,9 @@ extern void CSortEntity_deinit(CSortEntity* entity);
 
 // --------------------------------------------------------------------------------------------
 int CSortGetExtension(const String_View sv, String_View* ext);
-String CSortAppendPath(const char* path, const char* add);
-void CSortPerformOnFileCallback(CSort* csort, char* input_path, void (callback)(CSort* csort, const char* file_path, const char* file_name));
+int append_path(const char* path, const char* to_add, char* newpath, u32 len);
+int CSortPerformOnFileCallback(CSort* csort, const char* input_path, void (callback)(CSort* csort, const char* file_path));
+int CSortPerformOnFileCallbackRecur(CSort* csort, const char* input_path, void (callback)(CSort* csort, const char* input_filepath));
 
 // Declare CSortOpt functions defined by @macro(typedef_CSortOpt)
 declare_CSortOpt();
