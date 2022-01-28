@@ -17,17 +17,18 @@
 bin="csort"
 build_debug_dir="build_debug"
 build_test_dir="build_test"
+build_test_debug_dir="build_test_debug"
 build_release_dir="build"
 
 if [[ "$1" == "debug" ]]; then
     [[ ! -d "${build_debug_dir}" ]] && cmake -B "${build_debug_dir}" -DCMAKE_BUILD_TYPE=Debug
     make -C "${build_debug_dir}" && gdb -q "${build_debug_dir}/${bin}"
 elif [[ "$1" == "test" ]]; then
-    [[ ! -d "${build_test_dir}" ]] && cmake -B "${build_test_dir}" -DBUILD_TEST=ON
+    [[ ! -d "${build_test_dir}" ]] && cmake -B "${build_test_dir}" -DBUILD_TEST=ON -DBUILD_RELEASE=OFF
     make -C "${build_test_dir}" && "${build_test_dir}/test"
 elif [[ "$1" == "debug_test" ]]; then
-    [[ ! -d "${build_test_dir}" ]] && cmake -B "${build_test_dir}" -DCMAKE_BUILD_TYPE=Debug -DBUILD_TEST=ON
-    make -C "${build_test_dir}" && gdb -q "${build_test_dir}/test"
+    [[ ! -d "${build_test_debug_dir}" ]] && cmake -B "${build_test_debug_dir}"  -DBUILD_RELEASE=OFF -DCMAKE_BUILD_TYPE=Debug -DBUILD_TEST=ON
+    make -C "${build_test_debug_dir}" && gdb -q "${build_test_debug_dir}/test"
 elif [[ "$1" == "run_debug" ]]; then
     make -C "${build_debug_dir}" && "${build_debug_dir}/${bin}" "${@}"
 else

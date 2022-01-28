@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "../core.h"
 #include "../csort.h"
-#include "check.h"
+#include "test.h"
 
 typedef struct sample_struct sample_struct;
 struct sample_struct { int data; };
@@ -10,17 +10,44 @@ int main() {
     CHECK_Init();
     
     /* -------------------------------------------------------------------------------------------- */
-    TEST(CSort_nexttoken_for_identifiers) {
-        const char* fileName = "./test/example_test_python.py";
-        FILE* fp = fopen(fileName, "r");
-        if (! fp) {
-            eprintln("error: failed to open '%s'", fileName);
-            exit(1);
-        }
-        
-        // TODO(emf): implement test 
+    TEST(ParseCtxNextToken) {
+        CSort csort = CSort_mk();
+        CSort_init_config(&csort, NULL);
+        CSortEntity entity = CSortEntity_mk(&csort, "./test/example_test_python.py");
+        ParseCtx ctx = ParseCtx_mk(&csort, &entity);
 
-        fclose(fp);
+        // check if we are loading the file into memory buffer properly.
+        static const char* str =
+"from my_lib import Object\n"
+"\n"
+"import os\n"
+"\n"
+"from my_lib import Object3\n"
+"\n"
+"from my_lib import Object2\n"
+"\n"
+"import sys\n"
+"\n"
+"from third_party import lib15, lib1, lib2, lib3, lib4, lib5, lib6, lib7, lib8, lib9, lib10, lib11, lib12, lib13, lib14\n"
+"\n"
+"import sys\n"
+"\n"
+"from __future__ import absolute_import\n"
+"\n"
+"from third_party import lib3\n"
+"\n"
+"print(\"Hey\")\n"
+"print(\"yo\")\n"
+        ;
+        CHECK_STR(str, ctx.curr);
+
+
+        // D: another check.
+        ParseCtxNextToken(&ctx);
+
+        ParseCtx_deinit(&ctx);
+        CSortEntity_deinit(&entity);
+        CSort_deinit(&csort);
     }
 
     /* -------------------------------------------------------------------------------------------- */

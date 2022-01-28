@@ -8,6 +8,8 @@ set(CMAKE_C_FLAGS_DEBUG "-g -fsanitize=address -O0")
 set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG")
 
 project(${PROJECT_NAME} DESCRIPTION "import sorter for python")
+option(BUILD_TEST "Build Test" OFF)
+option(BUILD_RELEASE "Build Release" ON)
 
 # Compile external/lua
 set (LUA_DIR "./external/lua")
@@ -90,6 +92,17 @@ target_link_libraries(csortlib
     core
 )
 
+if(BUILD_TEST)
+    add_executable(test
+        test/test.h
+        test/test.c
+        config.h
+        config.c
+    )
+    target_link_libraries(test core lualib m csortlib)
+endif()
+
+if(BUILD_RELEASE)
 add_executable(${PROJECT_NAME}
     main.c
     config.h
@@ -101,3 +114,4 @@ target_link_libraries(${PROJECT_NAME}
     core
     csortlib
 )
+endif()

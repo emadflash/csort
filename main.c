@@ -15,7 +15,6 @@ _config_file_to_load(void) {
     return DEV_bool(access(csort_config_usr, F_OK) < 0) ? NULL : csort_config_usr;
 }
 
-
 internal CSortOptObj*
 CSort_update_config_via_cmd(CSort* csort, u32* options_len) {
     CSortMemArenaNode* mem = CSortMemArena_alloc(&csort->arena);

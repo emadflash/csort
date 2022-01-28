@@ -133,14 +133,19 @@ enum CSortTokenType {
     CSortTokenFrom,
     CSortTokenImport,
     CSortTokenComma,
-    CSortTokenSpace,
     CSortTokenIdentifier,
     CSortTokenString,
     CSortTokenNewline,
-    CSortTokenStart,
-    CSortTokenEnd,
     CSortTokenComment,
+    CSortTokenEof,
 };
+
+// Start of symbols, which are useful for us
+// from, import, as
+#define SYMBOLS_START\
+    case 'f':\
+    case 'i':\
+    case 'a':
 
 typedef struct CSortToken CSortToken;
 struct CSortToken {
@@ -163,40 +168,53 @@ CSortToken_mk(const String_View tok_view, enum CSortTokenType type, u32 next_tok
     };
 }
 
-internal inline CSortToken
-CSortToken_mk_initial() {
-    return (CSortToken) {
-        .tok_view = {0},
-        .type = CSortTokenStart,
-        .next_tok_offset = 0,
-        .line_num = 0,
-        .col_offset = 0,
-    };
-}
-
-
-
 // --------------------------------------------------------------------------------------------
-typedef struct _ParseInfo _ParseInfo;
-struct _ParseInfo {
-    CSortEntity*         entity;
-    CSortToken*    tok;
-    enum CSortTokenType prev_tok_type;
-    char           buf[512];
-    String_View    buf_view;
-    u32            line_counter;
+//
+// Tokenzier
+//
+// --------------------------------------------------------------------------------------------
+typedef struct ParseCtx ParseCtx;
+struct ParseCtx {
+    CSort* csort;
+    CSortMemArenaNode* data;
+    char* curr, *next, *end;
+    int ch;
+    u32 line_counter;
 };
 
+internal CSortMemArenaNode*
+readfile_into(CSortMemArena* arena, FILE* fp) {
+    CSortMemArenaNode* m = CSortMemArena_alloc(arena);
+    char buf[512];
+    u32 buf_len;
+    while (fgets(buf, 512, fp)) {
+        buf_len = strlen(buf);
+        CSortMemArenaNode_fill(m, buf, buf_len);
+        DEV_memzero(buf, 512);
+    }
+    CSortMemArenaNode_fill(m, (void*) "\0", 1);
+    return m;
+}
 
-internal inline _ParseInfo
-_ParseInfo_mk(CSortEntity* entity, CSortToken* tok) {
-    _ParseInfo p = {0};
-    p.entity = entity;
-    p.prev_tok_type = CSortTokenStart;
-    p.tok = tok;
-    p.buf_view = SV_buff(p.buf, 0);
+internal inline ParseCtx
+ParseCtx_mk(CSort* csort, const CSortEntity* entity) {
+    ParseCtx p = {0};
+    p.csort = csort;
+    p.data = readfile_into(&csort->arena, entity->input_file);
+    // Set #curr, #next and #end
+    p.curr = p.next = (char*) p.data->mem;
+    p.next += 1;
+    p.end = (char*) p.data->mem + p.data->mem_used;
+    p.ch = (p.curr != p.end) ? *p.curr : -1;
     p.line_counter = 0;
     return p;
 }
+
+internal void
+ParseCtx_deinit(ParseCtx* ctx) {
+    CSortMemArena_dealloc(&ctx->csort->arena, ctx->data);
+}
+
+CSortToken ParseCtxNextToken(ParseCtx* ctx);
 
 #endif
